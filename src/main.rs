@@ -6,9 +6,7 @@ fn main() {
     // first
     let data = send(
         json!({
-            "messageID": 3,
-            "guid":"-1",
-            "script":"print(\"Hello, World\")"
+            "messageID": 0,
         })
         .to_string(),
     )
