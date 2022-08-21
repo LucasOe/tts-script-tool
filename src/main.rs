@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 fn main() {
-    // first
+    // get save data
     let data = send(
         json!({
             "messageID": 0,
@@ -14,7 +14,7 @@ fn main() {
     let result: Value = serde_json::from_str(&data).unwrap();
     println!("{:?}", result);
 
-    // second
+    // execute script
     let data = send(
         json!({
             "messageID": 3,
