@@ -20,25 +20,37 @@ fn main() {
 
     let data = listen().unwrap();
     let result: Value = serde_json::from_str(&data).unwrap();
-    println!("{:?}", result["scriptStates"]);
+    println!("{:?}", result);
+
+    // reload
+    let msg = json!({
+        "messageID": 1,
+        "scriptStates": format!("{}", result["scriptStates"].to_string())
+    })
+    .to_string();
+    write(&stream, msg); // doens't execute
+
+    println!("Test");
+    let data = listen().unwrap(); // stuck here
 
     let contents = fs::read_to_string(path).expect("Can't read file.");
+}
+
+fn listen() -> Option<String> {
+    let listener = TcpListener::bind("127.0.0.1:39998").unwrap();
+    match listener.accept() {
+        Ok((stream, _addr)) => Some(read(&stream)),
+        Err(_) => None,
+    }
 }
 
 fn write(mut stream: &TcpStream, msg: String) {
     stream.write(msg.as_bytes()).unwrap();
 }
 
-fn listen() -> Option<String> {
-    let listener = TcpListener::bind("127.0.0.1:39998").unwrap();
-    match listener.accept() {
-        Ok((stream, _addr)) => Some(handle_connection(stream)),
-        Err(_) => None,
-    }
-}
-
-fn handle_connection(mut stream: TcpStream) -> String {
+fn read(mut stream: &TcpStream) -> String {
     let mut buffer = String::new();
     stream.read_to_string(&mut buffer).unwrap();
+    stream.flush().unwrap();
     buffer
 }
