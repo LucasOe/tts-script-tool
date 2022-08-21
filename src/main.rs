@@ -8,21 +8,24 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let path = &args[1];
 
-    let mut stream = TcpStream::connect("127.0.0.1:39999").expect("Couldn't connect to server.");
-
+    let stream = TcpStream::connect("127.0.0.1:39999").expect("Couldn't connect to server.");
     println!("Connected!");
+
     // get objects
     let msg = json!({
-            "messageID": 0
+        "messageID": 0
     })
     .to_string();
-    stream.write(msg.as_bytes()).unwrap();
 
     let data = listen().unwrap();
     let result: Value = serde_json::from_str(&data).unwrap();
     println!("{:?}", result["scriptStates"]);
 
     let contents = fs::read_to_string(path).expect("Can't read file.");
+}
+
+fn write(mut stream: &TcpStream, msg: String) {
+    stream.write(msg.as_bytes()).unwrap();
 }
 
 fn listen() -> Option<String> {
