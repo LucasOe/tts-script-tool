@@ -16,6 +16,7 @@ fn main() {
         "messageID": 0
     })
     .to_string();
+    write(&stream, msg);
 
     let data = listen().unwrap();
     let result: Value = serde_json::from_str(&data).unwrap();
