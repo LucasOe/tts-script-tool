@@ -1,5 +1,1 @@
-#include Utils.ttslua
-
-function onLoad()
-	print("Hello World!")
-end
+print("Hello, World!")
