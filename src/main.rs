@@ -1,31 +1,44 @@
 use serde_json::{json, Value};
+use snailquote::unescape;
+use std::env;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
+#[allow(unused_variables)]
 fn main() {
-    // get save data
-    let data = send(
-        json!({
-            "messageID": 0,
-        })
-        .to_string(),
-    )
-    .unwrap();
-    let result: Value = serde_json::from_str(&data).unwrap();
-    println!("{:?}", result);
+    let args: Vec<String> = env::args().collect();
+    //let url = &args[1];
 
-    // execute script
+    // get all guids
+    let tags = execute_lua_code(
+        r#"
+            list = {}
+            for _, obj in pairs(getAllObjects()) do
+                if obj.hasAnyTag() then
+                    list[obj.guid] = obj.getTags()
+                end
+            end
+            return JSON.encode(list)
+        "#,
+        "-1",
+    );
+    println!("{:?}", tags);
+}
+
+fn execute_lua_code(code: &str, guid: &str) -> Value {
     let data = send(
         json!({
             "messageID": 3,
-            "guid":"-1",
-            "script":"print(\"Hello, Mars\")"
+            "returnID": "5",
+            "guid": guid,
+            "script": code
         })
         .to_string(),
     )
     .unwrap();
     let result: Value = serde_json::from_str(&data).unwrap();
-    println!("{:?}", result);
+    let return_value = &unescape(&result["returnValue"].to_string()).unwrap();
+    serde_json::from_str(return_value).unwrap()
 }
 
 fn send(msg: String) -> Option<String> {
