@@ -22,16 +22,19 @@ fn main() {
     let result: Value = serde_json::from_str(&data).unwrap();
     println!("{:?}", result);
 
-    // reload
+    // execute script
+    let new_stream = TcpStream::connect("127.0.0.1:39999").expect("Couldn't connect to server.");
     let msg = json!({
-        "messageID": 1,
-        "scriptStates": format!("{}", result["scriptStates"].to_string())
+        "messageID": 3,
+        "guid": "-1",
+        "script": "print(\"Hello, World!\")"
     })
     .to_string();
-    write(&stream, msg); // doens't execute
+    write(&new_stream, msg);
 
-    println!("Test");
-    let data = listen().unwrap(); // stuck here
+    let data = listen().unwrap();
+    let result: Value = serde_json::from_str(&data).unwrap();
+    println!("{:?}", result);
 
     let contents = fs::read_to_string(path).expect("Can't read file.");
 }
@@ -45,7 +48,8 @@ fn listen() -> Option<String> {
 }
 
 fn write(mut stream: &TcpStream, msg: String) {
-    stream.write(msg.as_bytes()).unwrap();
+    stream.write_all(msg.as_bytes()).unwrap();
+    stream.flush().unwrap();
 }
 
 fn read(mut stream: &TcpStream) -> String {
