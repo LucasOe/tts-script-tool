@@ -121,8 +121,8 @@ fn reload(path: &PathBuf) -> Result<()> {
         "#,
         "-1",
     )?;
+    let mut script_list: Map<String, Value> = Map::new();
     if let Value::Object(guid_tags) = guid_tags {
-        let mut script_list: Map<String, Value> = Map::new();
         // get scripts from tags and store them in script_list
         for (guid, tags) in guid_tags {
             if let Some(tag) = get_valid_tags(tags, &guid)? {
@@ -137,8 +137,24 @@ fn reload(path: &PathBuf) -> Result<()> {
                 script_list.insert(guid.clone(), Value::String(file_content));
             }
         }
-
-        println!("{:?}", script_list);
+    }
+    let save_data = get_lua_scripts()?;
+    let script_states = &save_data["scriptStates"];
+    if let Value::Array(objects) = script_states {
+        for object in objects {
+            if let Value::Object(object) = object {
+                if let Value::String(guid) = object.get("guid").unwrap() {
+                    let local_script = script_list.get(guid);
+                    match local_script {
+                        Some(local_script) => {
+                            println!("{}: {}\n", guid, local_script);
+                            // Todo: Update scriptStates and reload
+                        }
+                        None => continue,
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }
