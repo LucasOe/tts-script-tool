@@ -8,8 +8,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     match args.len() {
-        1 => println!("No arguments found. Try passing some arguments!"),
-        2 => {
+        3 => {
             let command = &args[1];
             match &command[..] {
                 "add" => {
@@ -23,7 +22,7 @@ fn main() {
                 _ => println!("Invalid command"),
             }
         }
-        _ => println!("Too many arguments!"),
+        _ => println!("Invalid arguments"),
     }
 }
 
