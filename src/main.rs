@@ -3,6 +3,8 @@ use snailquote::unescape;
 use std::env;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::path::Path;
+use walkdir::WalkDir;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -11,14 +13,15 @@ fn main() {
         3 => {
             let command = &args[1];
             match &command[..] {
-                "add" => {
-                    println!("Adding tags");
-                    add_tags("path");
-                }
-                "reload" => {
-                    println!("Reloading");
-                    reload("url");
-                }
+                "set" => println!("Not enough arguments"),
+                "reload" => reload(&args[2]),
+                _ => println!("Invalid command"),
+            }
+        }
+        4 => {
+            let command = &args[1];
+            match &command[..] {
+                "set" => read_path(&args[2], &args[3]),
                 _ => println!("Invalid command"),
             }
         }
@@ -26,8 +29,36 @@ fn main() {
     }
 }
 
-// Add the script or the directory of scripts as a tag.
-fn add_tags(_path: &str) {}
+// Iterate over dir (non-recursive) and add tag for every file.
+fn read_path(path: &str, guid: &str) {
+    let path = Path::new(path);
+    if !path.exists() {
+        return println!("Path doesn't exist");
+    }
+
+    for entry in WalkDir::new(path)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| e.file_type().is_file())
+    {
+        let file_name = String::from(entry.file_name().to_string_lossy());
+        println!("Adding \"scripts/{}\" as a tag for \"{}\"", file_name, guid);
+        add_tag(&file_name, guid);
+    }
+}
+
+// Add the file as a tag. Tags use scripts/<File>.ttslua as a naming convention.
+// Guid has to be global so objects without scripts can execute code.
+fn add_tag(file_name: &str, guid: &str) {
+    execute_lua_code(
+        &format!(
+            r#"
+                getObjectFromGUID("{guid}").setTags({{"scripts/{file_name}"}})
+            "#,
+        ),
+        "-1",
+    );
+}
 
 // Update the lua scripts and reload the save file.
 fn reload(_url: &str) {
