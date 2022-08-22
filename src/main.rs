@@ -56,8 +56,8 @@ fn set_tag(file_name: &str, guid: &str) {
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
 // Returns Null if there are multiple tags with this name.
 #[allow(dead_code)]
-fn get_valid_tags(_tags: Value) -> Value {
-    Value::Null
+fn get_valid_tags(_tags: Value) -> Vec<String> {
+    vec![]
 }
 
 // Update the lua scripts and reload the save file.
@@ -77,7 +77,8 @@ fn reload(_url: &str) {
     match guid_tags {
         Value::Object(guid_tags) => {
             for (guid, tags) in guid_tags {
-                println!("{}: {}", guid, tags);
+                let valid_tags = get_valid_tags(tags);
+                println!("{}: {:?}", guid, valid_tags);
             }
         }
         _ => panic!("guid_tags not an object."),
