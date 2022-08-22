@@ -2,8 +2,9 @@ use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
 use regex::Regex;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use snailquote::unescape;
+use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -67,7 +68,7 @@ fn get_file_name(path: &PathBuf) -> Result<&str> {
         let file_name = path.file_name().unwrap();
         Ok(file_name.to_str().unwrap())
     } else {
-        bail!("{:?} doesn't exist or is not a file", path)
+        bail!("{:?} is not a file", path)
     }
 }
 
@@ -107,7 +108,7 @@ fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
 }
 
 // Update the lua scripts and reload the save file.
-fn reload(_path: &PathBuf) -> Result<()> {
+fn reload(path: &PathBuf) -> Result<()> {
     let guid_tags = execute_lua_code(
         r#"
             list = {}
@@ -121,18 +122,40 @@ fn reload(_path: &PathBuf) -> Result<()> {
         "-1",
     )?;
     if let Value::Object(guid_tags) = guid_tags {
+        let mut script_list: Map<String, Value> = Map::new();
+        // get scripts from tags and store them in script_list
         for (guid, tags) in guid_tags {
             if let Some(tag) = get_valid_tags(tags, &guid)? {
+                let file_path = get_file_from_tag(path, &tag, &guid)?;
+                let file_content = fs::read_to_string(file_path)?;
                 println!(
                     "{} {} with tag {:?}",
                     format!("updating:").green().bold(),
                     guid,
                     tag
-                )
+                );
+                script_list.insert(guid.clone(), Value::String(file_content));
             }
         }
+
+        println!("{:?}", script_list);
     }
     Ok(())
+}
+
+fn get_file_from_tag(path: &PathBuf, tag: &String, guid: &String) -> Result<String> {
+    let path = Path::new(path);
+    let file_name = Path::new(&tag).file_name().unwrap();
+    if path.exists() && path.is_dir() {
+        let file_path = path.join(file_name);
+        if file_path.exists() && file_path.is_file() {
+            Ok(String::from(file_path.to_string_lossy()))
+        } else {
+            bail!("file for {:?} with tag {} not found", guid, tag)
+        }
+    } else {
+        bail!("{:?} is not a directory", path)
+    }
 }
 
 // Executes lua code inside Tabletop Simulator and returns the value.
@@ -152,6 +175,18 @@ fn execute_lua_code(code: &str, guid: &str) -> Result<Value> {
     let result: Value = serde_json::from_str(&data).unwrap();
     let return_value = unescape_value(&result["returnValue"]);
     Ok(serde_json::from_str(&return_value).unwrap())
+}
+
+// Get lua scripts
+#[allow(dead_code)]
+fn get_lua_scripts() -> Result<Value> {
+    let data = send(
+        json!({
+            "messageID": 0,
+        })
+        .to_string(),
+    )?;
+    Ok(serde_json::from_str(&data).unwrap())
 }
 
 fn unescape_value(value: &Value) -> String {
