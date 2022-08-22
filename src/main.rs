@@ -21,16 +21,17 @@ enum Commands {
     Attach {
         /// Path to the file that should be attached
         #[clap(parse(from_os_str))]
-        path: std::path::PathBuf,
-        /// The guid of the object
+        path: PathBuf,
+        /// Optional: The guid of the object the script should be attached to.
+        /// If not provided a list of all objects will be shown.
         #[clap(value_parser)]
-        guid: String,
+        guid: Option<String>,
     },
     /// Update scripts and reload save
     Reload {
         /// Path to the directory with all scripts
         #[clap(parse(from_os_str))]
-        path: std::path::PathBuf,
+        path: PathBuf,
     },
 }
 
@@ -47,7 +48,10 @@ fn run(args: Args) -> Result<()> {
     match &args.command {
         Commands::Attach { path, guid } => {
             let file_name = get_file_name(path)?;
-            set_tag(file_name, guid)?;
+            match guid {
+                Some(guid) => set_tag(file_name, guid)?,
+                None => todo!("List objects to select from"),
+            }
         }
         Commands::Reload { path } => {
             reload(path)?;
