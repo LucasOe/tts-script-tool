@@ -1,32 +1,42 @@
+use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
 use regex::Regex;
 use serde_json::{json, Value};
 use snailquote::unescape;
-use std::env;
 use std::io::{Error, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(subcommand)]
+    command: Commands,
+}
 
-    match args.len() {
-        3 => {
-            let command = &args[1];
-            match &command[..] {
-                "set" => println!("Not enough arguments"),
-                "reload" => reload(&args[2]),
-                _ => println!("Invalid command"),
-            }
-        }
-        4 => {
-            let command = &args[1];
-            match &command[..] {
-                "set" => read_path(&args[2], &args[3]),
-                _ => println!("Invalid command"),
-            }
-        }
-        _ => println!("Invalid arguments"),
+#[derive(Subcommand)]
+enum Commands {
+    // Attach script to object
+    Set {
+        #[clap(value_parser)]
+        path: String,
+
+        #[clap(value_parser)]
+        guid: String,
+    },
+    // Update scripts and reload save
+    Reload {
+        #[clap(value_parser)]
+        url: String,
+    },
+}
+
+fn main() {
+    let args = Args::parse();
+
+    match &args.command {
+        Commands::Set { path, guid } => read_path(path, guid),
+        Commands::Reload { url } => reload(url),
     }
 }
 
@@ -95,7 +105,7 @@ fn reload(_url: &str) {
                 Ok(tag) => {
                     println!(
                         "{} {} with {:?}",
-                        format!("Updating:").green().bold(),
+                        format!("updating:").green().bold(),
                         guid,
                         tag
                     )
@@ -103,7 +113,7 @@ fn reload(_url: &str) {
                 Err("duplicate tags") => {
                     println!(
                         "{} {} has multiple valid script tags",
-                        format!("Error:").red().bold(),
+                        format!("error:").red().bold(),
                         guid
                     )
                 }
@@ -134,7 +144,7 @@ fn execute_lua_code(code: &str, guid: &str) -> Value {
             serde_json::from_str(&return_value).unwrap()
         }
         Err(_err) => {
-            eprintln!("{} Can't connect to server", format!("Error:").red().bold());
+            eprintln!("{} Can't connect to server", format!("error:").red().bold());
             Value::Null
         }
     }
