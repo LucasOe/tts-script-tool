@@ -35,20 +35,15 @@ enum Commands {
 }
 
 fn main() {
-    match run() {
-        Ok(_) => {
-            std::process::exit(0);
-        }
-        Err(err) => {
-            println!("{} {}", format!("error:").red().bold(), err);
-            std::process::exit(1);
-        }
+    let args = Args::parse();
+
+    if let Err(err) = run(args) {
+        println!("{} {}", format!("error:").red().bold(), err);
+        std::process::exit(1);
     }
 }
 
-fn run() -> Result<()> {
-    let args = Args::parse();
-
+fn run(args: Args) -> Result<()> {
     match &args.command {
         Commands::Attach { path, guid } => {
             let file_name = get_file_name(path)?;
@@ -58,7 +53,6 @@ fn run() -> Result<()> {
             reload(path)?;
         }
     }
-
     Ok(())
 }
 
@@ -69,7 +63,7 @@ fn get_file_name(path: &PathBuf) -> Result<&str> {
         let file_name = path.file_name().unwrap();
         Ok(file_name.to_str().unwrap())
     } else {
-        bail!("file doesn't exist")
+        bail!("{:?} doesn't exist or is not a file", path)
     }
 }
 
@@ -91,21 +85,20 @@ fn set_tag(file_name: &str, guid: &str) -> Result<()> {
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
 // Returns None if there are multiple valid tags.
 fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
-    match tags {
-        Value::Array(tags) => {
-            let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
-            let valid_tags: Vec<Value> = tags
-                .into_iter()
-                .filter(|tag| exprs.is_match(&unescape_value(tag)))
-                .collect();
+    if let Value::Array(tags) = tags {
+        let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
+        let valid_tags: Vec<Value> = tags
+            .into_iter()
+            .filter(|tag| exprs.is_match(&unescape_value(tag)))
+            .collect();
 
-            match valid_tags.len() {
-                1 => Ok(Some(unescape_value(&valid_tags[0]))),
-                0 => Ok(None),
-                _ => bail!("{} has multiple valid tags", guid),
-            }
+        match valid_tags.len() {
+            1 => Ok(Some(unescape_value(&valid_tags[0]))),
+            0 => Ok(None),
+            _ => bail!("{} has multiple valid tags", guid),
         }
-        _ => bail!("not an array"),
+    } else {
+        Ok(None)
     }
 }
 
