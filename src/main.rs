@@ -9,8 +9,8 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     //let url = &args[1];
 
-    // get all guids
-    let tags = execute_lua_code(
+    // get all guids and the associated tags
+    let guid_tags = execute_lua_code(
         r#"
             list = {}
             for _, obj in pairs(getAllObjects()) do
@@ -22,7 +22,14 @@ fn main() {
         "#,
         "-1",
     );
-    println!("{:?}", tags);
+    match guid_tags {
+        Value::Object(guid_tags) => {
+            for (guid, tags) in guid_tags {
+                println!("{}: {}", guid, tags);
+            }
+        }
+        _ => panic!("guid_tags not an object."),
+    }
 }
 
 // Executes lua code inside Tabletop Simulator and returns the value.
