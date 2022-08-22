@@ -25,6 +25,10 @@ fn main() {
     println!("{:?}", tags);
 }
 
+// Executes lua code inside Tabletop Simulator and returns the value.
+// Pass a guid of "-1" to execute code globally. When using the print
+// function inside the code, the return value may not get passed correctly!
+// Returns Null if the code returns nothing.
 fn execute_lua_code(code: &str, guid: &str) -> Value {
     let data = send(
         json!({
@@ -41,6 +45,7 @@ fn execute_lua_code(code: &str, guid: &str) -> Value {
     serde_json::from_str(return_value).unwrap()
 }
 
+// Sends a message to Tabletop Simulator and returns the answer as a String.
 fn send(msg: String) -> Option<String> {
     let mut stream = TcpStream::connect("127.0.0.1:39999").unwrap();
     stream.write_all(msg.as_bytes()).unwrap();
