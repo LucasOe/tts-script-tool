@@ -93,7 +93,7 @@ fn reload(_url: &str) {
             for (guid, tags) in guid_tags {
                 match get_valid_tags(tags) {
                     Ok(tag) => {
-                        println!("{}: {:?}", guid, tag)
+                        println!("Updating: {} with {:?}", guid, tag)
                     }
                     Err("duplicate tags") => {
                         println!("Error: {} has multiple valid script tags!", guid)
