@@ -56,7 +56,6 @@ fn set_tag(file_name: &str, guid: &str) {
 
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
 // Returns None if there are multiple valid tags.
-#[allow(dead_code)]
 fn get_valid_tags(tags: Value) -> Result<String, &'static str> {
     match tags {
         Value::Array(tags) => {
@@ -65,8 +64,11 @@ fn get_valid_tags(tags: Value) -> Result<String, &'static str> {
                 .into_iter()
                 .filter(|tag| exprs.is_match(&unescape_value(tag)))
                 .collect();
-            println!("{:?}", valid_tags);
-            Err("duplicate tags")
+
+            match valid_tags.len() {
+                1 => Ok(unescape_value(&valid_tags[0])),
+                _ => Err("duplicate tags"),
+            }
         }
         _ => Err("not an array"),
     }
@@ -91,9 +93,11 @@ fn reload(_url: &str) {
             for (guid, tags) in guid_tags {
                 match get_valid_tags(tags) {
                     Ok(tag) => {
-                        println!("{}: {:?}", guid, tag);
+                        println!("{}: {:?}", guid, tag)
                     }
-                    Err("duplicate tags") => println!("Object has multiple valid script tags!"),
+                    Err("duplicate tags") => {
+                        println!("Error: {} has multiple valid script tags!", guid)
+                    }
                     Err(_) => continue,
                 }
             }
