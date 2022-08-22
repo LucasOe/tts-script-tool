@@ -4,12 +4,34 @@ use std::env;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
-#[allow(unused_variables)]
 fn main() {
     let args: Vec<String> = env::args().collect();
-    //let url = &args[1];
 
-    // get all guids and the associated tags
+    match args.len() {
+        1 => println!("No arguments found. Try passing some arguments!"),
+        2 => {
+            let command = &args[1];
+            match &command[..] {
+                "add" => {
+                    println!("Adding tags");
+                    add_tags("path");
+                }
+                "reload" => {
+                    println!("Reloading");
+                    reload("url");
+                }
+                _ => println!("Invalid command"),
+            }
+        }
+        _ => println!("Too many arguments!"),
+    }
+}
+
+// Add the script or the directory of scripts as a tag.
+fn add_tags(_path: &str) {}
+
+// Update the lua scripts and reload the save file.
+fn reload(_url: &str) {
     let guid_tags = execute_lua_code(
         r#"
             list = {}
