@@ -40,7 +40,7 @@ fn read_path(path: &str, guid: &str) {
     set_tag(&file_name, guid);
 }
 
-// Add the file as a tag. Tags use scripts/<File>.ttslua as a naming convention.
+// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
 fn set_tag(file_name: &str, guid: &str) {
     execute_lua_code(
@@ -51,6 +51,13 @@ fn set_tag(file_name: &str, guid: &str) {
         ),
         "-1",
     );
+}
+
+// Get the tags that follow the "scripts/<File>.ttslua" naming convention.
+// Returns Null if there are multiple tags with this name.
+#[allow(dead_code)]
+fn get_valid_tags(_tags: Value) -> Value {
+    Value::Null
 }
 
 // Update the lua scripts and reload the save file.
