@@ -1,11 +1,12 @@
+use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
 use regex::Regex;
 use serde_json::{json, Value};
 use snailquote::unescape;
-use std::io::{Error, Read, Write};
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -16,45 +17,66 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    // Attach script to object
-    Set {
-        #[clap(value_parser)]
-        path: String,
-
+    /// Attach script to object
+    Attach {
+        /// Path to the file that should be attached
+        #[clap(parse(from_os_str))]
+        path: std::path::PathBuf,
+        /// The guid of the object
         #[clap(value_parser)]
         guid: String,
     },
-    // Update scripts and reload save
+    /// Update scripts and reload save
     Reload {
-        #[clap(value_parser)]
-        url: String,
+        /// Path to the directory with all scripts
+        #[clap(parse(from_os_str))]
+        path: std::path::PathBuf,
     },
 }
 
 fn main() {
-    let args = Args::parse();
-
-    match &args.command {
-        Commands::Set { path, guid } => read_path(path, guid),
-        Commands::Reload { url } => reload(url),
+    match run() {
+        Ok(_) => {
+            std::process::exit(0);
+        }
+        Err(err) => {
+            println!("{} {}", format!("error:").red().bold(), err);
+            std::process::exit(1);
+        }
     }
 }
 
-// Verify valid path and set tag for object with guid.
-fn read_path(path: &str, guid: &str) {
-    let path = Path::new(path);
-    if !path.exists() || path.is_dir() {
-        return println!("Path is not a file");
+fn run() -> Result<()> {
+    let args = Args::parse();
+
+    match &args.command {
+        Commands::Attach { path, guid } => {
+            let file_name = get_file_name(path)?;
+            set_tag(file_name, guid)?;
+        }
+        Commands::Reload { path } => {
+            reload(path)?;
+        }
     }
 
-    let file_name = String::from(path.file_name().unwrap().to_string_lossy());
-    println!("Adding \"scripts/{}\" as a tag for \"{}\"", file_name, guid);
-    set_tag(&file_name, guid);
+    Ok(())
+}
+
+// Verify valid path and set tag for object with guid.
+fn get_file_name(path: &PathBuf) -> Result<&str> {
+    let path = Path::new(path);
+    if path.exists() && path.is_file() {
+        let file_name = path.file_name().unwrap();
+        Ok(file_name.to_str().unwrap())
+    } else {
+        bail!("file doesn't exist")
+    }
 }
 
 // Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
-fn set_tag(file_name: &str, guid: &str) {
+fn set_tag(file_name: &str, guid: &str) -> Result<()> {
+    println!("Adding \"scripts/{}\" as a tag for \"{}\"", file_name, guid);
     execute_lua_code(
         &format!(
             r#"
@@ -62,12 +84,13 @@ fn set_tag(file_name: &str, guid: &str) {
             "#,
         ),
         "-1",
-    );
+    )?;
+    Ok(())
 }
 
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
 // Returns None if there are multiple valid tags.
-fn get_valid_tags(tags: Value) -> Result<String, &'static str> {
+fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
     match tags {
         Value::Array(tags) => {
             let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
@@ -77,16 +100,17 @@ fn get_valid_tags(tags: Value) -> Result<String, &'static str> {
                 .collect();
 
             match valid_tags.len() {
-                1 => Ok(unescape_value(&valid_tags[0])),
-                _ => Err("duplicate tags"),
+                1 => Ok(Some(unescape_value(&valid_tags[0]))),
+                0 => Ok(None),
+                _ => bail!("{} has multiple valid tags", guid),
             }
         }
-        _ => Err("not an array"),
+        _ => bail!("not an array"),
     }
 }
 
 // Update the lua scripts and reload the save file.
-fn reload(_url: &str) {
+fn reload(_path: &PathBuf) -> Result<()> {
     let guid_tags = execute_lua_code(
         r#"
             list = {}
@@ -98,36 +122,27 @@ fn reload(_url: &str) {
             return JSON.encode(list)
         "#,
         "-1",
-    );
+    )?;
     if let Value::Object(guid_tags) = guid_tags {
         for (guid, tags) in guid_tags {
-            match get_valid_tags(tags) {
-                Ok(tag) => {
-                    println!(
-                        "{} {} with {:?}",
-                        format!("updating:").green().bold(),
-                        guid,
-                        tag
-                    )
-                }
-                Err("duplicate tags") => {
-                    println!(
-                        "{} {} has multiple valid script tags",
-                        format!("error:").red().bold(),
-                        guid
-                    )
-                }
-                Err(_) => continue,
+            if let Some(tag) = get_valid_tags(tags, &guid)? {
+                println!(
+                    "{} {} with tag {:?}",
+                    format!("updating:").green().bold(),
+                    guid,
+                    tag
+                )
             }
         }
     }
+    Ok(())
 }
 
 // Executes lua code inside Tabletop Simulator and returns the value.
 // Pass a guid of "-1" to execute code globally. When using the print
 // function inside the code, the return value may not get passed correctly!
 // Returns Null if the code returns nothing.
-fn execute_lua_code(code: &str, guid: &str) -> Value {
+fn execute_lua_code(code: &str, guid: &str) -> Result<Value> {
     let data = send(
         json!({
             "messageID": 3,
@@ -136,18 +151,10 @@ fn execute_lua_code(code: &str, guid: &str) -> Value {
             "script": code
         })
         .to_string(),
-    );
-    match data {
-        Ok(data) => {
-            let result: Value = serde_json::from_str(&data).unwrap();
-            let return_value = unescape_value(&result["returnValue"]);
-            serde_json::from_str(&return_value).unwrap()
-        }
-        Err(_err) => {
-            eprintln!("{} Can't connect to server", format!("error:").red().bold());
-            Value::Null
-        }
-    }
+    )?;
+    let result: Value = serde_json::from_str(&data).unwrap();
+    let return_value = unescape_value(&result["returnValue"]);
+    Ok(serde_json::from_str(&return_value).unwrap())
 }
 
 fn unescape_value(value: &Value) -> String {
@@ -155,16 +162,14 @@ fn unescape_value(value: &Value) -> String {
 }
 
 // Sends a message to Tabletop Simulator and returns the answer as a String.
-fn send(msg: String) -> Result<String, Error> {
+fn send(msg: String) -> Result<String> {
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
     stream.flush().unwrap();
 
     let listener = TcpListener::bind("127.0.0.1:39998")?;
-    match listener.accept() {
-        Ok((stream, _addr)) => Ok(read(&stream)),
-        Err(err) => Err(err),
-    }
+    let (stream, _addr) = listener.accept()?;
+    Ok(read(&stream))
 }
 
 fn read(mut stream: &TcpStream) -> String {

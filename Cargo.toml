@@ -8,6 +8,7 @@ description = "Attach and update scripts in Tabletop Simulator via the command l
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.62"
 clap = { version = "3.2.17", features = ["derive"] }
 colorize = "0.1.0"
 regex = "1.6.0"
