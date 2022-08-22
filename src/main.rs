@@ -1,8 +1,9 @@
+use colorize::AnsiColor;
 use regex::Regex;
 use serde_json::{json, Value};
 use snailquote::unescape;
 use std::env;
-use std::io::{Read, Write};
+use std::io::{Error, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
@@ -88,21 +89,27 @@ fn reload(_url: &str) {
         "#,
         "-1",
     );
-    match guid_tags {
-        Value::Object(guid_tags) => {
-            for (guid, tags) in guid_tags {
-                match get_valid_tags(tags) {
-                    Ok(tag) => {
-                        println!("Updating: {} with {:?}", guid, tag)
-                    }
-                    Err("duplicate tags") => {
-                        println!("Error: {} has multiple valid script tags!", guid)
-                    }
-                    Err(_) => continue,
+    if let Value::Object(guid_tags) = guid_tags {
+        for (guid, tags) in guid_tags {
+            match get_valid_tags(tags) {
+                Ok(tag) => {
+                    println!(
+                        "{} {} with {:?}",
+                        format!("Updating:").green().bold(),
+                        guid,
+                        tag
+                    )
                 }
+                Err("duplicate tags") => {
+                    println!(
+                        "{} {} has multiple valid script tags",
+                        format!("Error:").red().bold(),
+                        guid
+                    )
+                }
+                Err(_) => continue,
             }
         }
-        _ => panic!("guid_tags not an object."),
     }
 }
 
@@ -119,11 +126,18 @@ fn execute_lua_code(code: &str, guid: &str) -> Value {
             "script": code
         })
         .to_string(),
-    )
-    .unwrap();
-    let result: Value = serde_json::from_str(&data).unwrap();
-    let return_value = unescape_value(&result["returnValue"]);
-    serde_json::from_str(&return_value).unwrap()
+    );
+    match data {
+        Ok(data) => {
+            let result: Value = serde_json::from_str(&data).unwrap();
+            let return_value = unescape_value(&result["returnValue"]);
+            serde_json::from_str(&return_value).unwrap()
+        }
+        Err(_err) => {
+            eprintln!("{} Can't connect to server", format!("Error:").red().bold());
+            Value::Null
+        }
+    }
 }
 
 fn unescape_value(value: &Value) -> String {
@@ -131,15 +145,15 @@ fn unescape_value(value: &Value) -> String {
 }
 
 // Sends a message to Tabletop Simulator and returns the answer as a String.
-fn send(msg: String) -> Option<String> {
-    let mut stream = TcpStream::connect("127.0.0.1:39999").unwrap();
+fn send(msg: String) -> Result<String, Error> {
+    let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
     stream.flush().unwrap();
 
-    let listener = TcpListener::bind("127.0.0.1:39998").unwrap();
+    let listener = TcpListener::bind("127.0.0.1:39998")?;
     match listener.accept() {
-        Ok((stream, _addr)) => Some(read(&stream)),
-        Err(_) => None,
+        Ok((stream, _addr)) => Ok(read(&stream)),
+        Err(err) => Err(err),
     }
 }
 
