@@ -28,7 +28,7 @@ fn main() {
     }
 }
 
-// Iterate over dir (non-recursive) and add tag for every file.
+// Verify valid path and set tag for object with guid.
 fn read_path(path: &str, guid: &str) {
     let path = Path::new(path);
     if !path.exists() || path.is_dir() {
