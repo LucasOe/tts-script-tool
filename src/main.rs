@@ -1,3 +1,4 @@
+use regex::Regex;
 use serde_json::{json, Value};
 use snailquote::unescape;
 use std::env;
@@ -54,10 +55,21 @@ fn set_tag(file_name: &str, guid: &str) {
 }
 
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
-// Returns None if there are multiple tags with this name.
+// Returns None if there are multiple valid tags.
 #[allow(dead_code)]
-fn get_valid_tags(_tags: Value) -> Option<String> {
-    None
+fn get_valid_tags(tags: Value) -> Result<String, &'static str> {
+    match tags {
+        Value::Array(tags) => {
+            let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
+            let valid_tags: Vec<Value> = tags
+                .into_iter()
+                .filter(|tag| exprs.is_match(&unescape_value(tag)))
+                .collect();
+            println!("{:?}", valid_tags);
+            Err("duplicate tags")
+        }
+        _ => Err("not an array"),
+    }
 }
 
 // Update the lua scripts and reload the save file.
@@ -78,10 +90,11 @@ fn reload(_url: &str) {
         Value::Object(guid_tags) => {
             for (guid, tags) in guid_tags {
                 match get_valid_tags(tags) {
-                    Some(tag) => {
+                    Ok(tag) => {
                         println!("{}: {:?}", guid, tag);
                     }
-                    None => continue,
+                    Err("duplicate tags") => println!("Object has multiple valid script tags!"),
+                    Err(_) => continue,
                 }
             }
         }
@@ -105,8 +118,12 @@ fn execute_lua_code(code: &str, guid: &str) -> Value {
     )
     .unwrap();
     let result: Value = serde_json::from_str(&data).unwrap();
-    let return_value = &unescape(&result["returnValue"].to_string()).unwrap();
-    serde_json::from_str(return_value).unwrap()
+    let return_value = unescape_value(&result["returnValue"]);
+    serde_json::from_str(&return_value).unwrap()
+}
+
+fn unescape_value(value: &Value) -> String {
+    unescape(&value.to_string()).unwrap()
 }
 
 // Sends a message to Tabletop Simulator and returns the answer as a String.
