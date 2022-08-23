@@ -50,7 +50,7 @@ fn run(args: Args) -> Result<()> {
         Commands::Attach { path, guid } => {
             let file_name = get_file_name(path)?;
             match guid {
-                Some(guid) => set_tag(file_name, guid)?,
+                Some(guid) => attach(file_name, guid)?,
                 None => todo!("List objects to select from"),
             }
         }
@@ -61,7 +61,7 @@ fn run(args: Args) -> Result<()> {
     Ok(())
 }
 
-// Verify valid path and set tag for object with guid.
+// Verify that the path exists and is a file
 fn get_file_name(path: &PathBuf) -> Result<&str> {
     let path = Path::new(path);
     if path.exists() && path.is_file() {
@@ -72,36 +72,11 @@ fn get_file_name(path: &PathBuf) -> Result<&str> {
     }
 }
 
-// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
-// Guid has to be global so objects without scripts can execute code.
-fn set_tag(file_name: &str, guid: &str) -> Result<()> {
-    println!("Adding \"scripts/{}\" as a tag for \"{}\"", file_name, guid);
-    execute_lua_code(&format!(
-        r#"
-            getObjectFromGUID("{guid}").setTags({{"scripts/{file_name}"}})
-        "#,
-    ))?;
+// Attaches the script to an object by adding the script tag and the script,
+// and then reloading the save.
+fn attach(file_name: &str, guid: &str) -> Result<()> {
+    set_tag(file_name, guid)?;
     Ok(())
-}
-
-// Get the tags that follow the "scripts/<File>.ttslua" naming convention.
-// Returns None if there are multiple valid tags.
-fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
-    if let Value::Array(tags) = tags {
-        let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
-        let valid_tags: Vec<Value> = tags
-            .into_iter()
-            .filter(|tag| exprs.is_match(&unescape_value(tag)))
-            .collect();
-
-        match valid_tags.len() {
-            1 => Ok(Some(unescape_value(&valid_tags[0]))),
-            0 => Ok(None),
-            _ => bail!("{} has multiple script tags", guid),
-        }
-    } else {
-        Ok(None)
-    }
 }
 
 // Update the lua scripts and reload the save file.
@@ -126,22 +101,7 @@ fn reload(path: &PathBuf) -> Result<()> {
                     if let Some(tag) = valid_tags {
                         let file_path = get_file_from_tag(path, &tag, &guid)?;
                         let file_content = fs::read_to_string(file_path)?;
-                        let result = execute_lua_code(&format!(
-                            r#"
-                                return getObjectFromGUID("{guid}").setLuaScript("{}")
-                            "#,
-                            file_content.escape_default()
-                        ))?
-                        .as_bool()
-                        .unwrap();
-                        if result {
-                            println!(
-                                "{} {} with tag {:?}",
-                                format!("updated:").green().bold(),
-                                &guid,
-                                tag
-                            );
-                        }
+                        set_script(&guid, &file_content, &tag)?;
                     }
                 }
                 Err(err) => println!("{} {}", format!("error:").red().bold(), err),
@@ -167,6 +127,60 @@ fn reload(path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
+// Guid has to be global so objects without scripts can execute code.
+fn set_tag(file_name: &str, guid: &str) -> Result<()> {
+    println!("Adding \"scripts/{}\" as a tag for \"{}\"", file_name, guid);
+    execute_lua_code(&format!(
+        r#"
+            getObjectFromGUID("{guid}").setTags({{"scripts/{file_name}"}})
+        "#,
+    ))?;
+    Ok(())
+}
+
+// Sets the script for the object.
+fn set_script(guid: &String, script: &String, tag: &str) -> Result<bool> {
+    let result = execute_lua_code(&format!(
+        r#"
+            return getObjectFromGUID("{guid}").setLuaScript("{}")
+        "#,
+        script.escape_default()
+    ))?
+    .as_bool()
+    .unwrap();
+    if result {
+        println!(
+            "{} {} with tag {:?}",
+            format!("updated:").green().bold(),
+            &guid,
+            tag
+        );
+    }
+    Ok(result)
+}
+
+// Get the tags that follow the "scripts/<File>.ttslua" naming convention.
+// Returns None if there are multiple valid tags.
+fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
+    if let Value::Array(tags) = tags {
+        let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
+        let valid_tags: Vec<Value> = tags
+            .into_iter()
+            .filter(|tag| exprs.is_match(&unescape_value(tag)))
+            .collect();
+
+        match valid_tags.len() {
+            1 => Ok(Some(unescape_value(&valid_tags[0]))),
+            0 => Ok(None),
+            _ => bail!("{} has multiple script tags", guid),
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+// Gets the corresponding from the path according to the tag. Path has to be a directory.
 fn get_file_from_tag(path: &PathBuf, tag: &String, guid: &String) -> Result<String> {
     let path = Path::new(path);
     let file_name = Path::new(&tag).file_name().unwrap();
@@ -182,6 +196,7 @@ fn get_file_from_tag(path: &PathBuf, tag: &String, guid: &String) -> Result<Stri
     }
 }
 
+// Unescapes a Value and returns it as a String.
 fn unescape_value(value: &Value) -> String {
     unescape(&value.to_string()).unwrap()
 }
