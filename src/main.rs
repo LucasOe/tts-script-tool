@@ -76,14 +76,11 @@ fn get_file_name(path: &PathBuf) -> Result<&str> {
 // Guid has to be global so objects without scripts can execute code.
 fn set_tag(file_name: &str, guid: &str) -> Result<()> {
     println!("Adding \"scripts/{}\" as a tag for \"{}\"", file_name, guid);
-    execute_lua_code(
-        &format!(
-            r#"
-                getObjectFromGUID("{guid}").setTags({{"scripts/{file_name}"}})
-            "#,
-        ),
-        "-1",
-    )?;
+    execute_lua_code(&format!(
+        r#"
+            getObjectFromGUID("{guid}").setTags({{"scripts/{file_name}"}})
+        "#,
+    ))?;
     Ok(())
 }
 
@@ -120,22 +117,30 @@ fn reload(path: &PathBuf) -> Result<()> {
             end
             return JSON.encode(list)
         "#,
-        "-1",
     )?;
     let mut script_list: Map<String, Value> = Map::new();
-    // get scripts from tags and store them in script_list
+    // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
         for (guid, tags) in guid_tags {
             if let Some(tag) = get_valid_tags(tags, &guid)? {
                 let file_path = get_file_from_tag(path, &tag, &guid)?;
                 let file_content = fs::read_to_string(file_path)?;
-                println!(
-                    "{} {} with tag {:?}",
-                    format!("updating:").green().bold(),
-                    guid,
-                    tag
-                );
-                script_list.insert(guid.clone(), Value::String(file_content));
+                let result = execute_lua_code(&format!(
+                    r#"
+                        return getObjectFromGUID("{guid}").setLuaScript("{}")
+                    "#,
+                    file_content.escape_default()
+                ))?
+                .as_bool()
+                .unwrap();
+                if result {
+                    println!(
+                        "{} {} with tag {:?}",
+                        format!("updated:").green().bold(),
+                        &guid,
+                        tag
+                    );
+                }
             }
         }
     }
@@ -152,30 +157,10 @@ fn reload(path: &PathBuf) -> Result<()> {
             Err(_) => unescape(&script_states[0].get("script").unwrap().to_string()).unwrap(),
         }),
     );
-    // build new scriptStates with local scripts
-    let mut local_script_states: Vec<Value> = vec![];
-    for object in script_states {
-        if let Value::Object(object) = object {
-            let guid = object.get("guid").unwrap();
-            let name = object.get("name").unwrap();
-            let empty = json!("");
-            let ui = object.get("ui").unwrap_or(&empty);
 
-            let local_script = script_list.get(&unescape_value(guid));
-            match local_script {
-                Some(local_script) => {
-                    local_script_states.push(json!({
-                        "guid": guid,
-                        "name": name,
-                        "script": local_script,
-                        "ui": ui
-                    }));
-                }
-                None => continue,
-            }
-        }
-    }
-    save_and_play(local_script_states)?;
+    // Todo: Update Global
+    let script_states: Vec<Value> = vec![];
+    save_and_play(script_states)?;
     Ok(())
 }
 
@@ -226,12 +211,12 @@ fn save_and_play(script_states: Vec<Value>) -> Result<()> {
 // Pass a guid of "-1" to execute code globally. When using the print
 // function inside the code, the return value may not get passed correctly!
 // Returns Null if the code returns nothing.
-fn execute_lua_code(code: &str, guid: &str) -> Result<Value> {
+fn execute_lua_code(code: &str) -> Result<Value> {
     let data = send(
         json!({
             "messageID": 3,
             "returnID": "5",
-            "guid": guid,
+            "guid": "-1",
             "script": code
         })
         .to_string(),
