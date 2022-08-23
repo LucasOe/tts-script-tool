@@ -153,7 +153,7 @@ fn reload(path: &PathBuf) -> Result<()> {
         }),
     );
     // build new scriptStats with local scripts
-    let mut local_script_stats: Vec<Value> = vec![];
+    let mut local_script_states: Vec<Value> = vec![];
     for object in script_states {
         if let Value::Object(object) = object {
             let guid = object.get("guid").unwrap();
@@ -164,7 +164,7 @@ fn reload(path: &PathBuf) -> Result<()> {
             let local_script = script_list.get(&unescape_value(guid));
             match local_script {
                 Some(local_script) => {
-                    local_script_stats.push(json!({
+                    local_script_states.push(json!({
                         "guid": guid,
                         "name": name,
                         "script": local_script,
@@ -175,11 +175,7 @@ fn reload(path: &PathBuf) -> Result<()> {
             }
         }
     }
-    let message = json!({
-        "messageID": 1,
-        "scriptStates": local_script_stats
-    });
-    send(message.to_string())?;
+    save_and_play(local_script_states)?;
     Ok(())
 }
 
@@ -196,6 +192,34 @@ fn get_file_from_tag(path: &PathBuf, tag: &String, guid: &String) -> Result<Stri
     } else {
         bail!("{:?} is not a directory", path)
     }
+}
+
+fn unescape_value(value: &Value) -> String {
+    unescape(&value.to_string()).unwrap()
+}
+
+// Get lua scripts
+fn get_lua_scripts() -> Result<Value> {
+    let data = send(
+        json!({
+            "messageID": 0,
+        })
+        .to_string(),
+    )?;
+    Ok(serde_json::from_str(&data).unwrap())
+}
+
+// Update the lua scripts and UI XML for any objects listed in the message,
+// and then reload the save file. Objects not mentioned are not updated.
+fn save_and_play(script_states: Vec<Value>) -> Result<()> {
+    send(
+        json!({
+            "messageID": 1,
+            "scriptStates": script_states
+        })
+        .to_string(),
+    )?;
+    Ok(())
 }
 
 // Executes lua code inside Tabletop Simulator and returns the value.
@@ -215,22 +239,6 @@ fn execute_lua_code(code: &str, guid: &str) -> Result<Value> {
     let result: Value = serde_json::from_str(&data).unwrap();
     let return_value = unescape_value(&result["returnValue"]);
     Ok(serde_json::from_str(&return_value).unwrap())
-}
-
-// Get lua scripts
-#[allow(dead_code)]
-fn get_lua_scripts() -> Result<Value> {
-    let data = send(
-        json!({
-            "messageID": 0,
-        })
-        .to_string(),
-    )?;
-    Ok(serde_json::from_str(&data).unwrap())
-}
-
-fn unescape_value(value: &Value) -> String {
-    unescape(&value.to_string()).unwrap()
 }
 
 // Sends a message to Tabletop Simulator and returns the answer as a String.
