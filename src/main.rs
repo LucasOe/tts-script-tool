@@ -109,6 +109,7 @@ fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
 
 // Update the lua scripts and reload the save file.
 fn reload(path: &PathBuf) -> Result<()> {
+    // map tags to guids
     let guid_tags = execute_lua_code(
         r#"
             list = {}
@@ -122,8 +123,8 @@ fn reload(path: &PathBuf) -> Result<()> {
         "-1",
     )?;
     let mut script_list: Map<String, Value> = Map::new();
+    // get scripts from tags and store them in script_list
     if let Value::Object(guid_tags) = guid_tags {
-        // get scripts from tags and store them in script_list
         for (guid, tags) in guid_tags {
             if let Some(tag) = get_valid_tags(tags, &guid)? {
                 let file_path = get_file_from_tag(path, &tag, &guid)?;
@@ -138,24 +139,47 @@ fn reload(path: &PathBuf) -> Result<()> {
             }
         }
     }
+    // get scriptStates
     let save_data = get_lua_scripts()?;
-    let script_states = &save_data["scriptStates"];
-    if let Value::Array(objects) = script_states {
-        for object in objects {
-            if let Value::Object(object) = object {
-                if let Value::String(guid) = object.get("guid").unwrap() {
-                    let local_script = script_list.get(guid);
-                    match local_script {
-                        Some(local_script) => {
-                            println!("{}: {}\n", guid, local_script);
-                            // Todo: Update scriptStates and reload
-                        }
-                        None => continue,
-                    }
+    let script_states = save_data["scriptStates"].as_array().unwrap();
+    // add global script to script_list
+    let global_path = Path::new(path).join("./Global.ttslua");
+    let global_file_content = fs::read_to_string(global_path);
+    script_list.insert(
+        "-1".to_string(),
+        Value::String(match global_file_content {
+            Ok(global_file_content) => global_file_content,
+            Err(_) => unescape(&script_states[0].get("script").unwrap().to_string()).unwrap(),
+        }),
+    );
+    // build new scriptStats with local scripts
+    let mut local_script_stats: Vec<Value> = vec![];
+    for object in script_states {
+        if let Value::Object(object) = object {
+            let guid = object.get("guid").unwrap();
+            let name = object.get("name").unwrap();
+            let empty = json!("");
+            let ui = object.get("ui").unwrap_or(&empty);
+
+            let local_script = script_list.get(&unescape_value(guid));
+            match local_script {
+                Some(local_script) => {
+                    local_script_stats.push(json!({
+                        "guid": guid,
+                        "name": name,
+                        "script": local_script,
+                        "ui": ui
+                    }));
                 }
+                None => continue,
             }
         }
     }
+    let message = json!({
+        "messageID": 1,
+        "scriptStates": local_script_stats
+    });
+    send(message.to_string())?;
     Ok(())
 }
 
