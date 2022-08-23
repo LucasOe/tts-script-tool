@@ -152,7 +152,7 @@ fn reload(path: &PathBuf) -> Result<()> {
             Err(_) => unescape(&script_states[0].get("script").unwrap().to_string()).unwrap(),
         }),
     );
-    // build new scriptStats with local scripts
+    // build new scriptStates with local scripts
     let mut local_script_states: Vec<Value> = vec![];
     for object in script_states {
         if let Value::Object(object) = object {
