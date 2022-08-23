@@ -97,7 +97,7 @@ fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
         match valid_tags.len() {
             1 => Ok(Some(unescape_value(&valid_tags[0]))),
             0 => Ok(None),
-            _ => bail!("{} has multiple valid tags", guid),
+            _ => bail!("{} has multiple script tags", guid),
         }
     } else {
         Ok(None)
@@ -121,25 +121,30 @@ fn reload(path: &PathBuf) -> Result<()> {
     // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
         for (guid, tags) in guid_tags {
-            if let Some(tag) = get_valid_tags(tags, &guid)? {
-                let file_path = get_file_from_tag(path, &tag, &guid)?;
-                let file_content = fs::read_to_string(file_path)?;
-                let result = execute_lua_code(&format!(
-                    r#"
-                        return getObjectFromGUID("{guid}").setLuaScript("{}")
-                    "#,
-                    file_content.escape_default()
-                ))?
-                .as_bool()
-                .unwrap();
-                if result {
-                    println!(
-                        "{} {} with tag {:?}",
-                        format!("updated:").green().bold(),
-                        &guid,
-                        tag
-                    );
+            match get_valid_tags(tags, &guid) {
+                Ok(valid_tags) => {
+                    if let Some(tag) = valid_tags {
+                        let file_path = get_file_from_tag(path, &tag, &guid)?;
+                        let file_content = fs::read_to_string(file_path)?;
+                        let result = execute_lua_code(&format!(
+                            r#"
+                                return getObjectFromGUID("{guid}").setLuaScript("{}")
+                            "#,
+                            file_content.escape_default()
+                        ))?
+                        .as_bool()
+                        .unwrap();
+                        if result {
+                            println!(
+                                "{} {} with tag {:?}",
+                                format!("updated:").green().bold(),
+                                &guid,
+                                tag
+                            );
+                        }
+                    }
                 }
+                Err(err) => println!("{} {}", format!("error:").red().bold(), err),
             }
         }
     }
