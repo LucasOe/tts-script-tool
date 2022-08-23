@@ -47,13 +47,10 @@ fn main() {
 
 fn run(args: Args) -> Result<()> {
     match &args.command {
-        Commands::Attach { path, guid } => {
-            let file_name = get_file_name(path)?;
-            match guid {
-                Some(guid) => attach(file_name, guid)?,
-                None => todo!("List objects to select from"),
-            }
-        }
+        Commands::Attach { path, guid } => match guid {
+            Some(guid) => attach(path, guid)?,
+            None => todo!("List objects to select from"),
+        },
         Commands::Reload { path } => {
             reload(path)?;
         }
@@ -61,21 +58,19 @@ fn run(args: Args) -> Result<()> {
     Ok(())
 }
 
-// Verify that the path exists and is a file
-fn get_file_name(path: &PathBuf) -> Result<&str> {
+// Attaches the script to an object by adding the script tag and the script,
+// and then reloading the save.
+fn attach(path: &PathBuf, guid: &String) -> Result<()> {
     let path = Path::new(path);
     if path.exists() && path.is_file() {
-        let file_name = path.file_name().unwrap();
-        Ok(file_name.to_str().unwrap())
+        let file_name = path.file_name().unwrap().to_str().unwrap();
+        let tag = set_tag(file_name, &guid)?;
+        let file_content = fs::read_to_string(path)?;
+        set_script(&guid, &file_content, &tag)?;
+        save_and_play(json!([]))?;
     } else {
         bail!("{:?} is not a file", path)
     }
-}
-
-// Attaches the script to an object by adding the script tag and the script,
-// and then reloading the save.
-fn attach(file_name: &str, guid: &str) -> Result<()> {
-    set_tag(file_name, guid)?;
     Ok(())
 }
 
@@ -129,14 +124,18 @@ fn reload(path: &PathBuf) -> Result<()> {
 
 // Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
-fn set_tag(file_name: &str, guid: &str) -> Result<()> {
-    println!("Adding \"scripts/{}\" as a tag for \"{}\"", file_name, guid);
+fn set_tag(file_name: &str, guid: &str) -> Result<String> {
+    let tag = format!("scripts/{file_name}");
+    println!(
+        "{} \"{tag}\" as a tag for \"{guid}\"",
+        format!("added:").yellow().bold()
+    );
     execute_lua_code(&format!(
         r#"
-            getObjectFromGUID("{guid}").setTags({{"scripts/{file_name}"}})
+            getObjectFromGUID("{guid}").setTags({{"{tag}"}})
         "#,
     ))?;
-    Ok(())
+    Ok(tag)
 }
 
 // Sets the script for the object.
@@ -151,10 +150,8 @@ fn set_script(guid: &String, script: &String, tag: &str) -> Result<bool> {
     .unwrap();
     if result {
         println!(
-            "{} {} with tag {:?}",
-            format!("updated:").green().bold(),
-            &guid,
-            tag
+            "{} {guid} with tag {tag}",
+            format!("updated:").yellow().bold()
         );
     }
     Ok(result)
@@ -222,6 +219,7 @@ fn save_and_play(script_states: Value) -> Result<()> {
         })
         .to_string(),
     )?;
+    println!("{}", format!("reloaded save!").green().bold());
     Ok(())
 }
 
