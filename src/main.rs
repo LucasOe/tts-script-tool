@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
 use regex::Regex;
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use snailquote::unescape;
 use std::fs;
 use std::io::{Read, Write};
@@ -118,7 +118,6 @@ fn reload(path: &PathBuf) -> Result<()> {
             return JSON.encode(list)
         "#,
     )?;
-    let mut script_list: Map<String, Value> = Map::new();
     // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
         for (guid, tags) in guid_tags {
@@ -149,18 +148,17 @@ fn reload(path: &PathBuf) -> Result<()> {
     let script_states = save_data["scriptStates"].as_array().unwrap();
     // add global script to script_list
     let global_path = Path::new(path).join("./Global.ttslua");
-    let global_file_content = fs::read_to_string(global_path);
-    script_list.insert(
-        "-1".to_string(),
-        Value::String(match global_file_content {
+
+    let message = json!([{
+        "guid": "-1",
+        "script": match fs::read_to_string(global_path) {
             Ok(global_file_content) => global_file_content,
             Err(_) => unescape(&script_states[0].get("script").unwrap().to_string()).unwrap(),
-        }),
-    );
+        },
+        "ui": unescape(&script_states[0].get("ui").unwrap().to_string()).unwrap()
+    }]);
+    save_and_play(message)?;
 
-    // Todo: Update Global
-    let script_states: Vec<Value> = vec![];
-    save_and_play(script_states)?;
     Ok(())
 }
 
@@ -196,7 +194,7 @@ fn get_lua_scripts() -> Result<Value> {
 
 // Update the lua scripts and UI XML for any objects listed in the message,
 // and then reload the save file. Objects not mentioned are not updated.
-fn save_and_play(script_states: Vec<Value>) -> Result<()> {
+fn save_and_play(script_states: Value) -> Result<()> {
     send(
         json!({
             "messageID": 1,
