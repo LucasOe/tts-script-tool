@@ -127,19 +127,7 @@ fn reload(path: &PathBuf) -> Result<()> {
 
 // Shows the user a list of all objects in the save to select from.
 fn select_object() -> Result<String> {
-    let objects = execute_lua_code(
-        r#"
-            list = {}
-            for _, obj in pairs(getAllObjects()) do
-                table.insert(list, obj.guid)
-            end
-            return JSON.encode(list)
-        "#,
-    )?
-    .as_array()
-    .unwrap()
-    .to_owned();
-
+    let objects = get_objects()?;
     let selection = Select::new("Select the object to attach the script to:", objects).prompt();
     match selection {
         Ok(selection) => Ok(unescape_value(&selection)),
@@ -166,22 +154,29 @@ fn set_tag(file_name: &str, guid: &str, print: bool) -> Result<String> {
 }
 
 // Sets the script for the object.
-fn set_script(guid: &String, script: &String, tag: &str) -> Result<bool> {
+fn set_script(guid: &String, script: &String, tag: &str) -> Result<()> {
+    // check if guid exists
+    let objects = get_objects()?;
+    if !objects.contains(&json!(&guid)) {
+        bail!("\"{guid}\" does not exist")
+    }
+    // add lua script for object
     let result = execute_lua_code(&format!(
         r#"
             return getObjectFromGUID("{guid}").setLuaScript("{}")
         "#,
         script.escape_default()
     ))?
-    .as_bool()
-    .unwrap();
-    if result {
-        println!(
+    .as_bool();
+    // return result and print confirmation
+    match result {
+        Some(_) => println!(
             "{} {guid} with tag {tag}",
             format!("updated:").yellow().bold()
-        );
-    }
-    Ok(result)
+        ),
+        None => bail!("could not set script for \"{guid}\""),
+    };
+    Ok(())
 }
 
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
@@ -223,6 +218,21 @@ fn get_file_from_tag(path: &PathBuf, tag: &String, guid: &String) -> Result<Stri
 // Unescapes a Value and returns it as a String.
 fn unescape_value(value: &Value) -> String {
     unescape(&value.to_string()).unwrap()
+}
+
+fn get_objects() -> Result<Vec<Value>> {
+    Ok(execute_lua_code(
+        r#"
+            list = {}
+            for _, obj in pairs(getAllObjects()) do
+                table.insert(list, obj.guid)
+            end
+            return JSON.encode(list)
+        "#,
+    )?
+    .as_array()
+    .unwrap()
+    .to_owned())
 }
 
 // Get lua scripts
