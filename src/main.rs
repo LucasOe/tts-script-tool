@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
+use inquire::Select;
 use regex::Regex;
 use serde_json::{json, Value};
 use snailquote::unescape;
@@ -46,28 +47,30 @@ fn main() {
 }
 
 fn run(args: Args) -> Result<()> {
-    match &args.command {
-        Commands::Attach { path, guid } => match guid {
-            Some(guid) => attach(path, guid)?,
-            None => todo!("List objects to select from"),
-        },
-        Commands::Reload { path } => {
-            reload(path)?;
-        }
+    match args.command {
+        Commands::Attach { path, guid } => attach(&path, guid)?,
+        Commands::Reload { path } => reload(&path)?,
     }
     Ok(())
 }
 
 // Attaches the script to an object by adding the script tag and the script,
 // and then reloading the save.
-fn attach(path: &PathBuf, guid: &String) -> Result<()> {
+fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
     let path = Path::new(path);
     if path.exists() && path.is_file() {
         let file_name = path.file_name().unwrap().to_str().unwrap();
-        let tag = set_tag(file_name, &guid)?;
+        let guid = match guid {
+            Some(guid) => guid,
+            None => select_object()?,
+        };
+        let tag = set_tag(file_name, &guid, true)?;
         let file_content = fs::read_to_string(path)?;
         set_script(&guid, &file_content, &tag)?;
         save_and_play(json!([]))?;
+        // wait for the game to load and add tags again
+        read()?;
+        set_tag(file_name, &guid, false)?;
     } else {
         bail!("{:?} is not a file", path)
     }
@@ -122,19 +125,43 @@ fn reload(path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+// Shows the user a list of all objects in the save to select from.
+fn select_object() -> Result<String> {
+    let objects = execute_lua_code(
+        r#"
+            list = {}
+            for _, obj in pairs(getAllObjects()) do
+                table.insert(list, obj.guid)
+            end
+            return JSON.encode(list)
+        "#,
+    )?
+    .as_array()
+    .unwrap()
+    .to_owned();
+
+    let selection = Select::new("Select the object to attach the script to:", objects).prompt();
+    match selection {
+        Ok(selection) => Ok(unescape_value(&selection)),
+        Err(_) => bail!("could not select an object to apply the script to"),
+    }
+}
+
 // Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
-fn set_tag(file_name: &str, guid: &str) -> Result<String> {
+fn set_tag(file_name: &str, guid: &str, print: bool) -> Result<String> {
     let tag = format!("scripts/{file_name}");
-    println!(
-        "{} \"{tag}\" as a tag for \"{guid}\"",
-        format!("added:").yellow().bold()
-    );
     execute_lua_code(&format!(
         r#"
             getObjectFromGUID("{guid}").setTags({{"{tag}"}})
         "#,
     ))?;
+    if print {
+        println!(
+            "{} \"{tag}\" as a tag for \"{guid}\"",
+            format!("added:").yellow().bold()
+        );
+    }
     Ok(tag)
 }
 
@@ -212,7 +239,7 @@ fn get_lua_scripts() -> Result<Value> {
 // Update the lua scripts and UI XML for any objects listed in the message,
 // and then reload the save file. Objects not mentioned are not updated.
 fn save_and_play(script_states: Value) -> Result<()> {
-    send(
+    let _data = send(
         json!({
             "messageID": 1,
             "scriptStates": script_states
@@ -247,15 +274,15 @@ fn send(msg: String) -> Result<String> {
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
     stream.flush().unwrap();
-
-    let listener = TcpListener::bind("127.0.0.1:39998")?;
-    let (stream, _addr) = listener.accept()?;
-    Ok(read(&stream))
+    Ok(read()?)
 }
 
-fn read(mut stream: &TcpStream) -> String {
+// TODO: Add timeout when no message is being recieved
+fn read() -> Result<String> {
+    let listener = TcpListener::bind("127.0.0.1:39998")?;
+    let (mut stream, _addr) = listener.accept()?;
     let mut buffer = String::new();
     stream.read_to_string(&mut buffer).unwrap();
     stream.flush().unwrap();
-    buffer
+    Ok(buffer)
 }
