@@ -138,6 +138,12 @@ fn select_object() -> Result<String> {
 // Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
 fn set_tag(file_name: &str, guid: &str, print: bool) -> Result<String> {
+    // check if guid exists
+    let objects = get_objects()?;
+    if !objects.contains(&json!(&guid)) {
+        bail!("\"{guid}\" does not exist")
+    }
+    // set tag for object
     let tag = format!("scripts/{file_name}");
     execute_lua_code(&format!(
         r#"
