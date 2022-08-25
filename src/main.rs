@@ -226,6 +226,7 @@ fn unescape_value(value: &Value) -> String {
     unescape(&value.to_string()).unwrap()
 }
 
+// Returns a list of all guids
 fn get_objects() -> Result<Vec<Value>> {
     Ok(execute_lua_code(
         r#"
