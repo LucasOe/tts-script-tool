@@ -35,6 +35,12 @@ enum Commands {
         #[clap(parse(from_os_str))]
         path: PathBuf,
     },
+    /// Backup current save
+    Backup {
+        /// Path to save location
+        #[clap(parse(from_os_str))]
+        path: PathBuf,
+    },
 }
 
 fn main() {
@@ -50,6 +56,7 @@ fn run(args: Args) -> Result<()> {
     match args.command {
         Commands::Attach { path, guid } => attach(&path, guid)?,
         Commands::Reload { path } => reload(&path)?,
+        Commands::Backup { path } => backup(&path)?,
     }
     Ok(())
 }
@@ -122,6 +129,27 @@ fn reload(path: &PathBuf) -> Result<()> {
     }]);
     save_and_play(message)?;
 
+    Ok(())
+}
+
+// Backup current save as file
+fn backup(path: &PathBuf) -> Result<()> {
+    let mut path = PathBuf::from(path);
+    path.set_extension("json");
+    let save_data = get_lua_scripts()?;
+    if let Value::Object(save_data) = save_data {
+        let save_path = match save_data.get("savePath") {
+            Some(save_path) => unescape_value(save_path),
+            None => bail!("can't find save path"),
+        };
+        fs::copy(&save_path, &path)?;
+        println!(
+            "{} \"{save_name}\" as \"{path}\"",
+            format!("save:").yellow().bold(),
+            save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap(),
+            path = path.to_str().unwrap()
+        );
+    }
     Ok(())
 }
 
