@@ -47,7 +47,7 @@ fn main() {
     let args = Args::parse();
 
     if let Err(err) = run(args) {
-        println!("{} {}", format!("error:").red().bold(), err);
+        println!("{} {}", "error:".red().bold(), err);
         std::process::exit(1);
     }
 }
@@ -109,7 +109,7 @@ fn reload(path: &PathBuf) -> Result<()> {
                         set_script(&guid, &file_content, &tag)?;
                     }
                 }
-                Err(err) => println!("{} {}", format!("error:").red().bold(), err),
+                Err(err) => println!("{} {}", "error:".red().bold(), err),
             }
         }
     }
@@ -145,7 +145,7 @@ fn backup(path: &PathBuf) -> Result<()> {
         fs::copy(&save_path, &path)?;
         println!(
             "{} \"{save_name}\" as \"{path}\"",
-            format!("save:").yellow().bold(),
+            "save:".yellow().bold(),
             save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap(),
             path = path.to_str().unwrap()
         );
@@ -181,14 +181,14 @@ fn set_tag(file_name: &str, guid: &str, print: bool) -> Result<String> {
     if print {
         println!(
             "{} \"{tag}\" as a tag for \"{guid}\"",
-            format!("added:").yellow().bold()
+            "added:".yellow().bold()
         );
     }
     Ok(tag)
 }
 
 // Sets the script for the object.
-fn set_script(guid: &String, script: &String, tag: &str) -> Result<()> {
+fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
     // check if guid exists
     let objects = get_objects()?;
     if !objects.contains(&json!(&guid)) {
@@ -204,10 +204,7 @@ fn set_script(guid: &String, script: &String, tag: &str) -> Result<()> {
     .as_bool();
     // return result and print confirmation
     match result {
-        Some(_) => println!(
-            "{} {guid} with tag {tag}",
-            format!("updated:").yellow().bold()
-        ),
+        Some(_) => println!("{} {guid} with tag {tag}", "updated:".yellow().bold()),
         None => bail!("could not set script for \"{guid}\""),
     };
     Ok(())
@@ -215,7 +212,7 @@ fn set_script(guid: &String, script: &String, tag: &str) -> Result<()> {
 
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
 // Returns None if there are multiple valid tags.
-fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
+fn get_valid_tags(tags: Value, guid: &str) -> Result<Option<String>> {
     if let Value::Array(tags) = tags {
         let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
         let valid_tags: Vec<Value> = tags
@@ -234,7 +231,7 @@ fn get_valid_tags(tags: Value, guid: &String) -> Result<Option<String>> {
 }
 
 // Gets the corresponding from the path according to the tag. Path has to be a directory.
-fn get_file_from_tag(path: &PathBuf, tag: &String, guid: &String) -> Result<String> {
+fn get_file_from_tag(path: &PathBuf, tag: &str, guid: &str) -> Result<String> {
     let path = Path::new(path);
     let file_name = Path::new(&tag).file_name().unwrap();
     if path.exists() && path.is_dir() {
@@ -291,7 +288,7 @@ fn save_and_play(script_states: Value) -> Result<()> {
         })
         .to_string(),
     )?;
-    println!("{}", format!("reloaded save!").green().bold());
+    println!("{}", "reloaded save!".green().bold());
     Ok(())
 }
 
@@ -319,7 +316,7 @@ fn send(msg: String) -> Result<String> {
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
     stream.flush().unwrap();
-    Ok(read()?)
+    read()
 }
 
 // TODO: Add timeout when no message is being recieved
