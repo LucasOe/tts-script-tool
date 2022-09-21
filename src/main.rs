@@ -101,15 +101,19 @@ fn reload(path: &PathBuf) -> Result<()> {
     // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
         for (guid, tags) in guid_tags {
-            match get_valid_tags(tags, &guid) {
-                Ok(valid_tags) => {
-                    if let Some(tag) = valid_tags {
-                        let file_path = get_file_from_tag(path, &tag, &guid)?;
-                        let file_content = fs::read_to_string(file_path)?;
-                        set_script(&guid, &file_content, &tag)?;
-                    }
+            if let Value::Array(tags) = tags {
+                let valid_tags = get_valid_tags(tags);
+                let valid_tag: Option<String> = match valid_tags.len() {
+                    1 => Some(unescape_value(&valid_tags[0])),
+                    0 => None,
+                    _ => bail!("{} has multiple script tags", guid),
+                };
+
+                if let Some(tag) = valid_tag {
+                    let file_path = get_file_from_tag(path, &tag, &guid)?;
+                    let file_content = fs::read_to_string(file_path)?;
+                    set_script(&guid, &file_content, &tag)?;
                 }
-                Err(err) => println!("{} {}", "error:".red().bold(), err),
             }
         }
     }
@@ -211,23 +215,14 @@ fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
 }
 
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
-// Returns None if there are multiple valid tags.
-fn get_valid_tags(tags: Value, guid: &str) -> Result<Option<String>> {
-    if let Value::Array(tags) = tags {
-        let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
-        let valid_tags: Vec<Value> = tags
-            .into_iter()
-            .filter(|tag| exprs.is_match(&unescape_value(tag)))
-            .collect();
+fn get_valid_tags(tags: Vec<Value>) -> Vec<Value> {
+    let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
+    let valid_tags: Vec<Value> = tags
+        .into_iter()
+        .filter(|tag| exprs.is_match(&unescape_value(tag)))
+        .collect();
 
-        match valid_tags.len() {
-            1 => Ok(Some(unescape_value(&valid_tags[0]))),
-            0 => Ok(None),
-            _ => bail!("{} has multiple script tags", guid),
-        }
-    } else {
-        Ok(None)
-    }
+    valid_tags
 }
 
 // Gets the corresponding from the path according to the tag. Path has to be a directory.
