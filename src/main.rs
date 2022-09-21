@@ -10,6 +10,11 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
+struct Tags {
+    valid: Vec<Value>,
+    invalid: Vec<Value>,
+}
+
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -71,13 +76,17 @@ fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
             Some(guid) => guid,
             None => select_object()?,
         };
-        let tag = set_tag(file_name, &guid, true)?;
+        let tag = set_tag(file_name, &guid)?;
+        println!(
+            "{} \"{tag}\" as a tag for \"{guid}\"",
+            "added:".yellow().bold()
+        );
         let file_content = fs::read_to_string(path)?;
         set_script(&guid, &file_content, &tag)?;
         save_and_play(json!([]))?;
         // wait for the game to load and add tags again
         read()?;
-        set_tag(file_name, &guid, false)?;
+        set_tag(file_name, &guid)?;
     } else {
         bail!("{:?} is not a file", path)
     }
@@ -102,7 +111,7 @@ fn reload(path: &PathBuf) -> Result<()> {
     if let Value::Object(guid_tags) = guid_tags {
         for (guid, tags) in guid_tags {
             if let Value::Array(tags) = tags {
-                let valid_tags = get_valid_tags(tags);
+                let valid_tags = get_valid_tags(tags).valid;
                 let valid_tag: Option<String> = match valid_tags.len() {
                     1 => Some(unescape_value(&valid_tags[0])),
                     0 => None,
@@ -169,26 +178,34 @@ fn select_object() -> Result<String> {
 
 // Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
-fn set_tag(file_name: &str, guid: &str, print: bool) -> Result<String> {
+fn set_tag(file_name: &str, guid: &str) -> Result<String> {
     // check if guid exists
     let objects = get_objects()?;
     if !objects.contains(&json!(&guid)) {
         bail!("\"{guid}\" does not exist")
     }
-    // set tag for object
+    // get existing tags for object
     let tag = format!("scripts/{file_name}");
-    execute_lua_code(&format!(
+    let tags = execute_lua_code(&format!(
         r#"
-            getObjectFromGUID("{guid}").setTags({{"{tag}"}})
+            return JSON.encode(getObjectFromGUID("{guid}").getTags())
         "#,
     ))?;
-    if print {
-        println!(
-            "{} \"{tag}\" as a tag for \"{guid}\"",
-            "added:".yellow().bold()
-        );
+    // set new tags for object
+    if let Value::Array(tags) = tags {
+        let mut tags = get_valid_tags(tags).invalid;
+        tags.push(Value::String(String::from(&tag)));
+        execute_lua_code(&format!(
+            r#"
+                tags = JSON.decode("{tags}")
+                getObjectFromGUID("{guid}").setTags(tags)
+            "#,
+            tags = json!(tags).to_string().escape_default(),
+        ))?;
+        Ok(tag)
+    } else {
+        bail!("could not set tag for \"{guid}\"")
     }
-    Ok(tag)
 }
 
 // Sets the script for the object.
@@ -214,15 +231,15 @@ fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
     Ok(())
 }
 
+// Split the tags into valid and non valid tags
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
-fn get_valid_tags(tags: Vec<Value>) -> Vec<Value> {
+fn get_valid_tags(tags: Vec<Value>) -> Tags {
     let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
-    let valid_tags: Vec<Value> = tags
+    let (valid, invalid): (Vec<Value>, Vec<Value>) = tags
         .into_iter()
-        .filter(|tag| exprs.is_match(&unescape_value(tag)))
-        .collect();
+        .partition(|tag| exprs.is_match(&unescape_value(tag)));
 
-    valid_tags
+    Tags { valid, invalid }
 }
 
 // Gets the corresponding from the path according to the tag. Path has to be a directory.
