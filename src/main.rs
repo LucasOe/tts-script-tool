@@ -67,7 +67,7 @@ fn run(args: Args) -> Result<()> {
 }
 
 /// Attaches the script to an object by adding the script tag and the script,
-/// and then reloading the save.
+/// and then reloads the save, the same way it does when pressing "Save & Play".
 fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
     let path = Path::new(path);
     if path.exists() && path.is_file() {
@@ -85,6 +85,7 @@ fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
         set_script(&guid, &file_content, &tag)?;
         save_and_play(json!([]))?;
         set_tag(file_name, &guid)?;
+        println!("To save the appied tag it is recommended to save the game before reloading.")
     } else {
         bail!("{:?} is not a file", path)
     }
@@ -340,7 +341,7 @@ fn send(msg: String, id: u64) -> Result<Value> {
 }
 
 /// Listen for message
-// TODO: Add timeout when no message is being recieved
+// TODO: Add timeout when tabletop simulator doesn't accept listener
 fn read() -> Result<Value> {
     let listener = TcpListener::bind("127.0.0.1:39998")?;
     let (mut stream, _addr) = listener.accept()?;
