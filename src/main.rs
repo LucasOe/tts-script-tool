@@ -232,7 +232,7 @@ fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
 /// Split the tags into valid and non valid tags
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
 fn get_valid_tags(tags: Vec<Value>) -> Tags {
-    let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
+    let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.lua|.ttslua)$").unwrap();
     let (valid, invalid): (Vec<Value>, Vec<Value>) = tags
         .into_iter()
         .partition(|tag| exprs.is_match(&unescape_value(tag)));
