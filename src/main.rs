@@ -66,8 +66,8 @@ fn run(args: Args) -> Result<()> {
     Ok(())
 }
 
-// Attaches the script to an object by adding the script tag and the script,
-// and then reloading the save.
+/// Attaches the script to an object by adding the script tag and the script,
+/// and then reloading the save.
 fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
     let path = Path::new(path);
     if path.exists() && path.is_file() {
@@ -84,8 +84,6 @@ fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
         let file_content = fs::read_to_string(path)?;
         set_script(&guid, &file_content, &tag)?;
         save_and_play(json!([]))?;
-        // wait for the game to load and add tags again
-        read()?;
         set_tag(file_name, &guid)?;
     } else {
         bail!("{:?} is not a file", path)
@@ -93,7 +91,7 @@ fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
     Ok(())
 }
 
-// Update the lua scripts and reload the save file.
+/// Update the lua scripts and reload the save file.
 fn reload(path: &PathBuf) -> Result<()> {
     // map tags to guids
     let guid_tags = execute_lua_code(
@@ -145,7 +143,7 @@ fn reload(path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-// Backup current save as file
+/// Backup current save as file
 fn backup(path: &PathBuf) -> Result<()> {
     let mut path = PathBuf::from(path);
     path.set_extension("json");
@@ -166,7 +164,7 @@ fn backup(path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-// Shows the user a list of all objects in the save to select from.
+/// Shows the user a list of all objects in the save to select from.
 fn select_object() -> Result<String> {
     let objects = get_objects()?;
     let selection = Select::new("Select the object to attach the script to:", objects).prompt();
@@ -176,7 +174,7 @@ fn select_object() -> Result<String> {
     }
 }
 
-// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
+/// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
 fn set_tag(file_name: &str, guid: &str) -> Result<String> {
     // check if guid exists
@@ -208,7 +206,7 @@ fn set_tag(file_name: &str, guid: &str) -> Result<String> {
     }
 }
 
-// Sets the script for the object.
+/// Sets the script for the object.
 fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
     // check if guid exists
     let objects = get_objects()?;
@@ -231,7 +229,7 @@ fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
     Ok(())
 }
 
-// Split the tags into valid and non valid tags
+/// Split the tags into valid and non valid tags
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
 fn get_valid_tags(tags: Vec<Value>) -> Tags {
     let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.ttslua)$").unwrap();
@@ -242,7 +240,7 @@ fn get_valid_tags(tags: Vec<Value>) -> Tags {
     Tags { valid, invalid }
 }
 
-// Gets the corresponding from the path according to the tag. Path has to be a directory.
+/// Gets the corresponding from the path according to the tag. Path has to be a directory.
 fn get_file_from_tag(path: &PathBuf, tag: &str, guid: &str) -> Result<String> {
     let path = Path::new(path);
     let file_name = Path::new(&tag).file_name().unwrap();
@@ -258,12 +256,12 @@ fn get_file_from_tag(path: &PathBuf, tag: &str, guid: &str) -> Result<String> {
     }
 }
 
-// Unescapes a Value and returns it as a String.
+/// Unescapes a Value and returns it as a String.
 fn unescape_value(value: &Value) -> String {
     unescape(&value.to_string()).unwrap()
 }
 
-// Returns a list of all guids
+/// Returns a list of all guids
 fn get_objects() -> Result<Vec<Value>> {
     Ok(execute_lua_code(
         r#"
@@ -279,37 +277,38 @@ fn get_objects() -> Result<Vec<Value>> {
     .to_owned())
 }
 
-// Get lua scripts
+/// Get lua scripts
 fn get_lua_scripts() -> Result<Value> {
-    let data = send(
+    send(
         json!({
             "messageID": 0,
         })
         .to_string(),
-    )?;
-    Ok(serde_json::from_str(&data).unwrap())
+        1,
+    )
 }
 
-// Update the lua scripts and UI XML for any objects listed in the message,
-// and then reload the save file. Objects not mentioned are not updated.
+/// Update the lua scripts and UI XML for any objects listed in the message,
+/// and then reload the save file. Objects not mentioned are not updated.
 fn save_and_play(script_states: Value) -> Result<()> {
-    let _data = send(
+    let _message = send(
         json!({
             "messageID": 1,
             "scriptStates": script_states
         })
         .to_string(),
+        1,
     )?;
     println!("{}", "reloaded save!".green().bold());
     Ok(())
 }
 
-// Executes lua code inside Tabletop Simulator and returns the value.
-// Pass a guid of "-1" to execute code globally. When using the print
-// function inside the code, the return value may not get passed correctly!
-// Returns Null if the code returns nothing.
+/// Executes lua code inside Tabletop Simulator and returns the value.
+/// Pass a guid of "-1" to execute code globally. When using the print
+/// function inside the code, the return value may not get passed correctly!
+/// Returns Null if the code returns nothing.
 fn execute_lua_code(code: &str) -> Result<Value> {
-    let data = send(
+    let message = send(
         json!({
             "messageID": 3,
             "returnID": "5",
@@ -317,26 +316,38 @@ fn execute_lua_code(code: &str) -> Result<Value> {
             "script": code
         })
         .to_string(),
+        5,
     )?;
-    let result: Value = serde_json::from_str(&data).unwrap();
-    let return_value = unescape_value(&result["returnValue"]);
-    Ok(serde_json::from_str(&return_value).unwrap())
+    let unescaped_message = &unescape_value(&message["returnValue"]);
+    let result_value: Value = serde_json::from_str(&unescaped_message).unwrap();
+    Ok(result_value)
 }
 
-// Sends a message to Tabletop Simulator and returns the answer as a String.
-fn send(msg: String) -> Result<String> {
+/// Sends a message to Tabletop Simulator and returns the answer as a String.
+fn send(msg: String, id: u64) -> Result<Value> {
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
     stream.flush().unwrap();
-    read()
+    // Wait for answer message and return it
+    let message = loop {
+        let message = read()?;
+        let message_id = message["messageID"].as_u64().unwrap();
+        if message_id == id {
+            break message;
+        }
+    };
+    Ok(message)
 }
 
+/// Listen for message
 // TODO: Add timeout when no message is being recieved
-fn read() -> Result<String> {
+fn read() -> Result<Value> {
     let listener = TcpListener::bind("127.0.0.1:39998")?;
     let (mut stream, _addr) = listener.accept()?;
     let mut buffer = String::new();
     stream.read_to_string(&mut buffer).unwrap();
     stream.flush().unwrap();
-    Ok(buffer)
+    // Convert String into Value::Object and return message
+    let message: Value = serde_json::from_str(&buffer)?;
+    Ok(message)
 }
