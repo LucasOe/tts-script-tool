@@ -48,6 +48,17 @@ enum Commands {
     },
 }
 
+/// Executes lua code inside Tabletop Simulator and returns the value.
+///
+/// This macro uses the same syntax as `format`.
+/// The first argument `execute_lua_code!` receives is a format string. This must be a string literal.
+/// To use special characters without escaping use raw string literals.
+macro_rules! execute_lua_code {
+    ($($arg:tt)+) => {
+        message_execute(format!($($arg)+))
+    };
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -83,9 +94,9 @@ fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
         );
         let file_content = fs::read_to_string(path)?;
         set_script(&guid, &file_content, &tag)?;
-        save_and_play(json!([]))?;
+        message_reload(json!([]))?;
         set_tag(file_name, &guid)?;
-        println!("To save the appied tag it is recommended to save the game before reloading.")
+        println!("To save the appied tag it is recommended to save the game before reloading.");
     } else {
         bail!("{:?} is not a file", path)
     }
@@ -95,9 +106,9 @@ fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
 /// Update the lua scripts and reload the save file.
 fn reload(path: &PathBuf) -> Result<()> {
     // map tags to guids
-    let guid_tags = execute_lua_code(
+    let guid_tags = execute_lua_code!(
         r#"
-            list = {}
+            list = {{}}
             for _, obj in pairs(getAllObjects()) do
                 if obj.hasAnyTag() then
                     list[obj.guid] = obj.getTags()
@@ -139,7 +150,7 @@ fn reload(path: &PathBuf) -> Result<()> {
         },
         "ui": unescape(&script_states[0].get("ui").unwrap().to_string()).unwrap()
     }]);
-    save_and_play(message)?;
+    message_reload(message)?;
 
     Ok(())
 }
@@ -185,22 +196,22 @@ fn set_tag(file_name: &str, guid: &str) -> Result<String> {
     }
     // get existing tags for object
     let tag = format!("scripts/{file_name}");
-    let tags = execute_lua_code(&format!(
+    let tags = execute_lua_code!(
         r#"
             return JSON.encode(getObjectFromGUID("{guid}").getTags())
         "#,
-    ))?;
+    )?;
     // set new tags for object
     if let Value::Array(tags) = tags {
         let mut tags = get_valid_tags(tags).invalid;
         tags.push(Value::String(String::from(&tag)));
-        execute_lua_code(&format!(
+        execute_lua_code!(
             r#"
                 tags = JSON.decode("{tags}")
                 getObjectFromGUID("{guid}").setTags(tags)
             "#,
             tags = json!(tags).to_string().escape_default(),
-        ))?;
+        )?;
         Ok(tag)
     } else {
         bail!("could not set tag for \"{guid}\"")
@@ -215,12 +226,12 @@ fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
         bail!("\"{guid}\" does not exist")
     }
     // add lua script for object
-    let result = execute_lua_code(&format!(
+    let result = execute_lua_code!(
         r#"
             return getObjectFromGUID("{guid}").setLuaScript("{}")
         "#,
         script.escape_default()
-    ))?
+    )?
     .as_bool();
     // return result and print confirmation
     match result {
@@ -262,11 +273,24 @@ fn unescape_value(value: &Value) -> String {
     unescape(&value.to_string()).unwrap()
 }
 
+/// Sends a message
+#[allow(dead_code)]
+fn send_message(message: &str) -> Result<Value> {
+    let message = execute_lua_code!(
+        r#"
+            broadcastToAll("{}")
+        "#,
+        message.escape_default()
+    );
+    println!("{:?}", message);
+    message
+}
+
 /// Returns a list of all guids
 fn get_objects() -> Result<Vec<Value>> {
-    Ok(execute_lua_code(
+    Ok(execute_lua_code!(
         r#"
-            list = {}
+            list = {{}}
             for _, obj in pairs(getAllObjects()) do
                 table.insert(list, obj.guid)
             end
@@ -291,8 +315,8 @@ fn get_lua_scripts() -> Result<Value> {
 
 /// Update the lua scripts and UI XML for any objects listed in the message,
 /// and then reload the save file. Objects not mentioned are not updated.
-fn save_and_play(script_states: Value) -> Result<()> {
-    let _message = send(
+fn message_reload(script_states: Value) -> Result<Value> {
+    let message = send(
         json!({
             "messageID": 1,
             "scriptStates": script_states
@@ -301,14 +325,11 @@ fn save_and_play(script_states: Value) -> Result<()> {
         1,
     )?;
     println!("{}", "reloaded save!".green().bold());
-    Ok(())
+    Ok(message)
 }
 
 /// Executes lua code inside Tabletop Simulator and returns the value.
-/// Pass a guid of "-1" to execute code globally. When using the print
-/// function inside the code, the return value may not get passed correctly!
-/// Returns Null if the code returns nothing.
-fn execute_lua_code(code: &str) -> Result<Value> {
+fn message_execute(code: String) -> Result<Value> {
     let message = send(
         json!({
             "messageID": 3,
@@ -324,7 +345,7 @@ fn execute_lua_code(code: &str) -> Result<Value> {
     Ok(result_value)
 }
 
-/// Sends a message to Tabletop Simulator and returns the answer as a String.
+/// Sends a message to Tabletop Simulator and returns the answer as a Value::Object.
 fn send(msg: String, id: u64) -> Result<Value> {
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
