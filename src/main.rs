@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use ttsst::{attach, backup, reload};
 
 #[derive(Parser)]
-#[clap(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None)]
 struct Args {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     command: Commands,
 }
 
@@ -16,23 +16,23 @@ enum Commands {
     /// Attach script to object
     Attach {
         /// Path to the file that should be attached
-        #[clap(parse(from_os_str))]
+        #[arg(value_parser)]
         path: PathBuf,
         /// Optional: The guid of the object the script should be attached to.
         /// If not provided a list of all objects will be shown.
-        #[clap(value_parser)]
+        #[arg(value_parser)]
         guid: Option<String>,
     },
     /// Update scripts and reload save
     Reload {
         /// Path to the directory with all scripts
-        #[clap(parse(from_os_str))]
+        #[arg(value_parser)]
         path: PathBuf,
     },
     /// Backup current save
     Backup {
         /// Path to save location
-        #[clap(parse(from_os_str))]
+        #[arg(value_parser)]
         path: PathBuf,
     },
 }
@@ -41,7 +41,7 @@ fn main() {
     let args = Args::parse();
 
     if let Err(err) = run(args) {
-        println!("{} {}", "error:".red().bold(), err);
+        eprintln!("{} {}", "error:".red().bold(), err);
         std::process::exit(1);
     }
 }
