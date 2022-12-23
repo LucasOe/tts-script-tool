@@ -5,15 +5,9 @@
 //! All communication messages are JSON.
 
 use crate::tcp::send;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
-
-#[derive(Debug)]
-pub enum Answer {
-    AnswerReload(AnswerReload),
-    AnswerReturn(AnswerReturn),
-}
 
 #[derive(Deserialize, Debug)]
 pub struct AnswerReload {
@@ -66,7 +60,7 @@ macro_rules! execute {
 
 /// Executes lua code inside Tabletop Simulator and returns the value.
 pub fn message_execute(script: String) -> Result<AnswerReturn> {
-    let answer = send(
+    send(
         json!({
             "messageID": 3,
             "returnID": "5",
@@ -75,41 +69,29 @@ pub fn message_execute(script: String) -> Result<AnswerReturn> {
         })
         .to_string(),
         5,
-    )?;
-    if let Answer::AnswerReturn(answer_return) = answer {
-        return Ok(answer_return);
-    }
-    bail!("Message couldn't be deserialized into an AnswerReturn");
+    )
 }
 
 /// Update the lua scripts and UI XML for any objects listed in the message,
 /// and then reload the save file. Objects not mentioned are not updated.
 pub fn message_reload(script_states: Value) -> Result<AnswerReload> {
-    let answer = send(
+    send(
         json!({
             "messageID": 1,
             "scriptStates": script_states
         })
         .to_string(),
         1,
-    )?;
-    if let Answer::AnswerReload(answer_reload) = answer {
-        return Ok(answer_reload);
-    }
-    bail!("Message couldn't be deserialized into an AnswerReturn");
+    )
 }
 
 /// Get lua scripts
 pub fn message_get_lua_scripts() -> Result<AnswerReload> {
-    let answer = send(
+    send(
         json!({
             "messageID": 0,
         })
         .to_string(),
         1,
-    )?;
-    if let Answer::AnswerReload(answer_reload) = answer {
-        return Ok(answer_reload);
-    }
-    bail!("Message couldn't be deserialized into an AnswerReturn");
+    )
 }

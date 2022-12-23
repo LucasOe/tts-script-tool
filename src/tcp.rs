@@ -1,29 +1,24 @@
-use crate::api::Answer;
-use anyhow::{bail, Result};
+use anyhow::Result;
+use serde::de;
 use serde_json::Value;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 /// Sends a message to Tabletop Simulator and returns the answer as a Value::Object.
-pub fn send(msg: String, id: u64) -> Result<Answer> {
+pub fn send<T: de::DeserializeOwned>(msg: String, id: u64) -> Result<T> {
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
     stream.flush().unwrap();
     // Wait for answer message with correct id and return it
-    let (message, id) = loop {
+    let message = loop {
         let message = read()?;
         let message_id = message["messageID"].as_u64().unwrap();
         if message_id == id {
-            break (message, message_id);
+            break message;
         }
     };
 
-    // Convert Value into Answer
-    match id {
-        1 => Ok(Answer::AnswerReload(serde_json::from_value(message)?)),
-        5 => Ok(Answer::AnswerReturn(serde_json::from_value(message)?)),
-        _ => bail!("Message couldn't be deserialized into an Answer"),
-    }
+    Ok(serde_json::from_value(message)?)
 }
 
 /// Listen for message
