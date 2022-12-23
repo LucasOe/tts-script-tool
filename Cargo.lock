@@ -461,7 +461,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tts-script-tool"
+name = "ttsst"
 version = "0.1.0"
 dependencies = [
  "anyhow",
