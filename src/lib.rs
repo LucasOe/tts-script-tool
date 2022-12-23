@@ -34,6 +34,7 @@ pub fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
         let file_content = fs::read_to_string(path)?;
         set_script(&guid, &file_content, &tag)?;
         message_reload(json!([]))?;
+        println!("{}", "reloaded save!".green().bold());
         set_tag(file_name, &guid)?;
         println!("To save the appied tag it is recommended to save the game before reloading.");
     } else {
@@ -55,13 +56,15 @@ pub fn reload(path: &PathBuf) -> Result<()> {
             end
             return JSON.encode(list)
         "#,
-    )?;
+    )
+    .get_return_value()?;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
         for (guid, tags) in guid_tags {
             if let Value::Array(tags) = tags {
                 let valid_tags = get_valid_tags(tags).valid;
+                // ensure that the object only has one valid tag
                 let valid_tag: Option<String> = match valid_tags.len() {
                     1 => Some(unescape_value(&valid_tags[0])),
                     0 => None,
@@ -76,21 +79,29 @@ pub fn reload(path: &PathBuf) -> Result<()> {
             }
         }
     }
+
     // get scriptStates
-    let save_data = get_lua_scripts()?;
-    let script_states = save_data["scriptStates"].as_array().unwrap();
+    let save_data = message_get_lua_scripts()?.get_script_states()?;
+    let script_states = save_data.as_array().unwrap();
+
     // add global script to script_list
     let global_path = Path::new(path).join("./Global.ttslua");
 
+    // get global script from file and fallback to existing script the from save data
+    let global_script = match fs::read_to_string(global_path) {
+        Ok(global_file_content) => global_file_content,
+        Err(_) => unescape(&script_states[0].get("script").unwrap().to_string()).unwrap(),
+    };
+    // get global ui from the save data
+    let global_ui = unescape(&script_states[0].get("ui").unwrap().to_string()).unwrap();
+
     let message = json!([{
         "guid": "-1",
-        "script": match fs::read_to_string(global_path) {
-            Ok(global_file_content) => global_file_content,
-            Err(_) => unescape(&script_states[0].get("script").unwrap().to_string()).unwrap(),
-        },
-        "ui": unescape(&script_states[0].get("ui").unwrap().to_string()).unwrap()
+        "script": global_script,
+        "ui": global_ui
     }]);
     message_reload(message)?;
+    println!("{}", "reloaded save!".green().bold());
 
     Ok(())
 }
@@ -99,20 +110,14 @@ pub fn reload(path: &PathBuf) -> Result<()> {
 pub fn backup(path: &PathBuf) -> Result<()> {
     let mut path = PathBuf::from(path);
     path.set_extension("json");
-    let save_data = get_lua_scripts()?;
-    if let Value::Object(save_data) = save_data {
-        let save_path = match save_data.get("savePath") {
-            Some(save_path) => unescape_value(save_path),
-            None => bail!("can't find save path"),
-        };
-        fs::copy(&save_path, &path)?;
-        println!(
-            "{} \"{save_name}\" as \"{path}\"",
-            "save:".yellow().bold(),
-            save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap(),
-            path = path.to_str().unwrap()
-        );
-    }
+    let save_path = message_get_lua_scripts()?.save_path;
+    fs::copy(&save_path, &path)?;
+    println!(
+        "{} \"{save_name}\" as \"{path}\"",
+        "save:".yellow().bold(),
+        save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap(),
+        path = path.to_str().unwrap()
+    );
     Ok(())
 }
 
@@ -140,7 +145,8 @@ fn set_tag(file_name: &str, guid: &str) -> Result<String> {
         r#"
             return JSON.encode(getObjectFromGUID("{guid}").getTags())
         "#,
-    )?;
+    )
+    .get_return_value()?;
     // set new tags for object
     if let Value::Array(tags) = tags {
         let mut tags = get_valid_tags(tags).invalid;
@@ -151,7 +157,7 @@ fn set_tag(file_name: &str, guid: &str) -> Result<String> {
                 getObjectFromGUID("{guid}").setTags(tags)
             "#,
             tags = json!(tags).to_string().escape_default(),
-        )?;
+        );
         Ok(tag)
     } else {
         bail!("could not set tag for \"{guid}\"")
@@ -166,18 +172,13 @@ fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
         bail!("\"{guid}\" does not exist")
     }
     // add lua script for object
-    let result = execute!(
+    execute!(
         r#"
-            return getObjectFromGUID("{guid}").setLuaScript("{}")
+            return JSON.encode(getObjectFromGUID("{guid}").setLuaScript("{}"))
         "#,
         script.escape_default()
-    )?
-    .as_bool();
-    // return result and print confirmation
-    match result {
-        Some(_) => println!("{} {guid} with tag {tag}", "updated:".yellow().bold()),
-        None => bail!("could not set script for \"{guid}\""),
-    };
+    );
+    println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
     Ok(())
 }
 
@@ -191,7 +192,8 @@ pub fn get_objects() -> Result<Vec<Value>> {
             end
             return JSON.encode(list)
         "#,
-    )?
+    )
+    .get_return_value()?
     .as_array()
     .unwrap()
     .to_owned())
@@ -222,4 +224,9 @@ fn get_file_from_tag(path: &PathBuf, tag: &str, guid: &str) -> Result<String> {
     } else {
         bail!("{:?} is not a directory", path)
     }
+}
+
+/// Unescapes a Value and returns it as a String.
+fn unescape_value(value: &Value) -> String {
+    unescape(&value.to_string()).unwrap()
 }

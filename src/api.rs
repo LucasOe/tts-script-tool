@@ -3,13 +3,54 @@
 //! Communication between the editor and TTS occurs via two localhost TCP connections:
 //! one where TTS listens for messages and one where ttsst listens for messages.
 //! All communication messages are JSON.
-#![allow(dead_code)]
 
 use crate::tcp::send;
-use anyhow::Result;
-use colorize::AnsiColor;
+use anyhow::{bail, Context, Result};
+use serde::Deserialize;
 use serde_json::{json, Value};
-use snailquote::unescape;
+
+#[derive(Debug)]
+pub enum Answer {
+    AnswerReload(AnswerReload),
+    AnswerReturn(AnswerReturn),
+}
+
+#[derive(Deserialize, Debug)]
+pub struct AnswerReload {
+    #[serde(rename = "messageID")]
+    pub message_id: u8,
+    #[serde(rename = "savePath")]
+    pub save_path: String,
+    #[serde(rename = "scriptStates")]
+    pub script_states: Value,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct AnswerReturn {
+    #[serde(rename = "messageID")]
+    pub message_id: u8,
+    #[serde(rename = "returnID")]
+    pub return_id: u8,
+    #[serde(rename = "returnValue")]
+    pub return_value: Option<String>,
+}
+
+impl AnswerReload {
+    pub fn get_script_states(&self) -> Result<Value> {
+        let script_states = &self.script_states;
+        Ok(script_states.clone())
+    }
+}
+
+impl AnswerReturn {
+    pub fn get_return_value(&self) -> Result<Value> {
+        let return_value = &self
+            .return_value
+            .clone()
+            .context("returnValue doesn't exist")?;
+        Ok(serde_json::from_str(&return_value)?)
+    }
+}
 
 /// Executes lua code inside Tabletop Simulator and returns the value.
 ///
@@ -19,29 +60,32 @@ use snailquote::unescape;
 #[macro_export]
 macro_rules! execute {
     ($($arg:tt)+) => {
-        message_execute(format!($($arg)+))
+        message_execute(format!($($arg)+))?
     };
 }
 
 /// Executes lua code inside Tabletop Simulator and returns the value.
-pub fn message_execute(code: String) -> Result<Value> {
-    let message = send(
+pub fn message_execute(script: String) -> Result<AnswerReturn> {
+    let answer = send(
         json!({
             "messageID": 3,
             "returnID": "5",
             "guid": "-1",
-            "script": code
+            "script": script
         })
         .to_string(),
         5,
     )?;
-    get_return_value(message)
+    if let Answer::AnswerReturn(answer_return) = answer {
+        return Ok(answer_return);
+    }
+    bail!("Message couldn't be deserialized into an AnswerReturn");
 }
 
 /// Update the lua scripts and UI XML for any objects listed in the message,
 /// and then reload the save file. Objects not mentioned are not updated.
-pub fn message_reload(script_states: Value) -> Result<Value> {
-    let message = send(
+pub fn message_reload(script_states: Value) -> Result<AnswerReload> {
+    let answer = send(
         json!({
             "messageID": 1,
             "scriptStates": script_states
@@ -49,40 +93,23 @@ pub fn message_reload(script_states: Value) -> Result<Value> {
         .to_string(),
         1,
     )?;
-    println!("{}", "reloaded save!".green().bold());
-    Ok(message)
-}
-
-/// Sends a message
-pub fn send_message(message: &str) -> Result<Value> {
-    let message = execute!(
-        r#"
-            broadcastToAll("{}")
-        "#,
-        message.escape_default()
-    );
-    println!("{:?}", message);
-    message
+    if let Answer::AnswerReload(answer_reload) = answer {
+        return Ok(answer_reload);
+    }
+    bail!("Message couldn't be deserialized into an AnswerReturn");
 }
 
 /// Get lua scripts
-pub fn get_lua_scripts() -> Result<Value> {
-    send(
+pub fn message_get_lua_scripts() -> Result<AnswerReload> {
+    let answer = send(
         json!({
             "messageID": 0,
         })
         .to_string(),
         1,
-    )
-}
-
-fn get_return_value(message: Value) -> Result<Value> {
-    let unescaped_message = &unescape_value(&message["returnValue"]);
-    let result_value: Value = serde_json::from_str(&unescaped_message).unwrap();
-    Ok(result_value)
-}
-
-/// Unescapes a Value and returns it as a String.
-pub fn unescape_value(value: &Value) -> String {
-    unescape(&value.to_string()).unwrap()
+    )?;
+    if let Answer::AnswerReload(answer_reload) = answer {
+        return Ok(answer_reload);
+    }
+    bail!("Message couldn't be deserialized into an AnswerReturn");
 }
