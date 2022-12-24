@@ -9,6 +9,10 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+pub trait HasId {
+    fn get_message_id() -> u64;
+}
+
 #[derive(Deserialize, Debug)]
 pub struct AnswerReload {
     #[serde(rename = "messageID")]
@@ -17,6 +21,19 @@ pub struct AnswerReload {
     pub save_path: String,
     #[serde(rename = "scriptStates")]
     pub script_states: Value,
+}
+
+impl HasId for AnswerReload {
+    fn get_message_id() -> u64 {
+        1
+    }
+}
+
+impl AnswerReload {
+    pub fn get_script_states(&self) -> Result<Value> {
+        let script_states = &self.script_states;
+        Ok(script_states.clone())
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -29,26 +46,9 @@ pub struct AnswerReturn {
     pub return_value: Option<String>,
 }
 
-pub trait MessageId {
-    fn get_message_id() -> u64;
-}
-
-impl MessageId for AnswerReload {
-    fn get_message_id() -> u64 {
-        1
-    }
-}
-
-impl MessageId for AnswerReturn {
+impl HasId for AnswerReturn {
     fn get_message_id() -> u64 {
         5
-    }
-}
-
-impl AnswerReload {
-    pub fn get_script_states(&self) -> Result<Value> {
-        let script_states = &self.script_states;
-        Ok(script_states.clone())
     }
 }
 
