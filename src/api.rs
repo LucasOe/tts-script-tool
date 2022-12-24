@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 pub trait HasId {
-    fn get_message_id() -> u64;
+    const MESSAGE_ID: u64;
 }
 
 #[derive(Deserialize, Debug)]
@@ -24,9 +24,7 @@ pub struct AnswerReload {
 }
 
 impl HasId for AnswerReload {
-    fn get_message_id() -> u64 {
-        1
-    }
+    const MESSAGE_ID: u64 = 1;
 }
 
 impl AnswerReload {
@@ -47,9 +45,7 @@ pub struct AnswerReturn {
 }
 
 impl HasId for AnswerReturn {
-    fn get_message_id() -> u64 {
-        5
-    }
+    const MESSAGE_ID: u64 = 5;
 }
 
 impl AnswerReturn {

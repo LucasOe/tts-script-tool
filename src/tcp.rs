@@ -14,7 +14,7 @@ pub fn send<T: de::DeserializeOwned + HasId>(msg: String) -> Result<T> {
     let message = loop {
         let message = read()?;
         let message_id = message["messageID"].as_u64().unwrap();
-        if message_id == T::get_message_id() {
+        if message_id == T::MESSAGE_ID {
             break message;
         }
     };
