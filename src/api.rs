@@ -13,7 +13,7 @@ pub trait HasId {
     const MESSAGE_ID: u8;
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, PartialEq)]
 pub struct MessageGetScripts {
     #[serde(rename = "messageID")]
     pub message_id: u8,
@@ -23,7 +23,7 @@ impl HasId for MessageGetScripts {
     const MESSAGE_ID: u8 = 0;
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, PartialEq)]
 pub struct MessageReload {
     #[serde(rename = "messageID")]
     pub message_id: u8,
@@ -35,12 +35,12 @@ impl HasId for MessageReload {
     const MESSAGE_ID: u8 = 1;
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, PartialEq)]
 pub struct MessageExectute {
     #[serde(rename = "messageID")]
     pub message_id: u8,
     #[serde(rename = "returnID")]
-    pub return_id: String,
+    pub return_id: u8,
     #[serde(rename = "guid")]
     pub guid: String,
     #[serde(rename = "script")]
@@ -51,7 +51,7 @@ impl HasId for MessageExectute {
     const MESSAGE_ID: u8 = 3;
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerReload {
     #[serde(rename = "messageID")]
     pub message_id: u8,
@@ -72,7 +72,7 @@ impl AnswerReload {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerReturn {
     #[serde(rename = "messageID")]
     pub message_id: u8,
@@ -128,8 +128,35 @@ macro_rules! execute {
 pub fn message_execute(script: String) -> Result<AnswerReturn> {
     send(&MessageExectute {
         message_id: MessageExectute::MESSAGE_ID,
-        return_id: String::from("5"),
+        return_id: 5,
         guid: String::from("-1"),
         script,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::*;
+
+    #[test]
+    fn test_execute() {
+        let script = String::from(
+            r#"
+                return JSON.encode("5")
+            "#,
+        );
+        let answer: AnswerReturn = send(&MessageExectute {
+            message_id: MessageExectute::MESSAGE_ID,
+            return_id: 5,
+            guid: String::from("-1"),
+            script,
+        })
+        .unwrap();
+        let expected_answer = AnswerReturn {
+            message_id: AnswerReturn::MESSAGE_ID,
+            return_id: 5,
+            return_value: Some("\"5\"".to_string()),
+        };
+        assert_eq!(answer, expected_answer);
+    }
 }
