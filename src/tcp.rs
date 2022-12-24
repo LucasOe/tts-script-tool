@@ -21,7 +21,6 @@ pub fn send<T: de::DeserializeOwned + HasId, U: Serialize>(message: &U) -> Resul
         if message_id == T::MESSAGE_ID {
             break message;
         };
-        println!("{:#?}", message)
     };
 
     Ok(serde_json::from_value(message)?)
