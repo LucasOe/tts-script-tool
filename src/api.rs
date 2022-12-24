@@ -6,11 +6,49 @@
 
 use crate::tcp::send;
 use anyhow::{Context, Result};
-use serde::Deserialize;
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 pub trait HasId {
-    const MESSAGE_ID: u64;
+    const MESSAGE_ID: u8;
+}
+
+#[derive(Serialize, Debug)]
+pub struct MessageGetScripts {
+    #[serde(rename = "messageID")]
+    pub message_id: u8,
+}
+
+impl HasId for MessageGetScripts {
+    const MESSAGE_ID: u8 = 0;
+}
+
+#[derive(Serialize, Debug)]
+pub struct MessageReload {
+    #[serde(rename = "messageID")]
+    pub message_id: u8,
+    #[serde(rename = "scriptStates")]
+    pub script_states: Value,
+}
+
+impl HasId for MessageReload {
+    const MESSAGE_ID: u8 = 1;
+}
+
+#[derive(Serialize, Debug)]
+pub struct MessageExectute {
+    #[serde(rename = "messageID")]
+    pub message_id: u8,
+    #[serde(rename = "returnID")]
+    pub return_id: String,
+    #[serde(rename = "guid")]
+    pub guid: String,
+    #[serde(rename = "script")]
+    pub script: String,
+}
+
+impl HasId for MessageExectute {
+    const MESSAGE_ID: u8 = 3;
 }
 
 #[derive(Deserialize, Debug)]
@@ -24,7 +62,7 @@ pub struct AnswerReload {
 }
 
 impl HasId for AnswerReload {
-    const MESSAGE_ID: u64 = 1;
+    const MESSAGE_ID: u8 = 1;
 }
 
 impl AnswerReload {
@@ -45,7 +83,7 @@ pub struct AnswerReturn {
 }
 
 impl HasId for AnswerReturn {
-    const MESSAGE_ID: u64 = 5;
+    const MESSAGE_ID: u8 = 5;
 }
 
 impl AnswerReturn {
@@ -60,24 +98,18 @@ impl AnswerReturn {
 
 /// Get lua scripts
 pub fn message_get_lua_scripts() -> Result<AnswerReload> {
-    send(
-        json!({
-            "messageID": 0,
-        })
-        .to_string(),
-    )
+    send(&MessageGetScripts {
+        message_id: MessageGetScripts::MESSAGE_ID,
+    })
 }
 
 /// Update the lua scripts and UI XML for any objects listed in the message,
 /// and then reload the save file. Objects not mentioned are not updated.
 pub fn message_reload(script_states: Value) -> Result<AnswerReload> {
-    send(
-        json!({
-            "messageID": 1,
-            "scriptStates": script_states
-        })
-        .to_string(),
-    )
+    send(&MessageReload {
+        message_id: MessageReload::MESSAGE_ID,
+        script_states,
+    })
 }
 
 /// Executes lua code inside Tabletop Simulator and returns the value.
@@ -94,13 +126,10 @@ macro_rules! execute {
 
 /// Executes lua code inside Tabletop Simulator and returns the value.
 pub fn message_execute(script: String) -> Result<AnswerReturn> {
-    send(
-        json!({
-            "messageID": 3,
-            "returnID": "5",
-            "guid": "-1",
-            "script": script
-        })
-        .to_string(),
-    )
+    send(&MessageExectute {
+        message_id: MessageExectute::MESSAGE_ID,
+        return_id: String::from("5"),
+        guid: String::from("-1"),
+        script,
+    })
 }
