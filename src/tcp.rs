@@ -1,5 +1,5 @@
 use crate::api::HasId;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{de, Serialize};
 use serde_json::Value;
 use std::io::{Read, Write};
@@ -15,9 +15,13 @@ pub fn send<T: de::DeserializeOwned + HasId, U: Serialize>(message: &U) -> Resul
     let message = loop {
         let message = read()?;
         let message_id = message["messageID"].as_u64().unwrap() as u8;
+        if message_id == 3 {
+            bail!(message);
+        };
         if message_id == T::MESSAGE_ID {
             break message;
-        }
+        };
+        println!("{:#?}", message)
     };
 
     Ok(serde_json::from_value(message)?)
