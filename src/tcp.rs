@@ -18,12 +18,11 @@ pub fn send<T: Serialize>(message: &T) -> Result<()> {
 
 /// Waits for an answer with the correct id. Returns an Error if `AnswerError` is revieved.
 pub fn read<T: DeserializeOwned + Answer>() -> Result<T> {
+    let listener = TcpListener::bind("127.0.0.1:39998")?;
     let answer: Value = loop {
-        let listener = TcpListener::bind("127.0.0.1:39998")?;
         let (mut stream, _addr) = listener.accept()?;
         let mut buffer = String::new();
         stream.read_to_string(&mut buffer).unwrap();
-        println!("Read message");
 
         // Convert String into Value
         let message: Value = serde_json::from_str(&buffer)?;
