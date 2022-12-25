@@ -2,7 +2,7 @@ mod api;
 mod tcp;
 
 use anyhow::{bail, Result};
-use api::*;
+pub use api::*;
 use colorize::AnsiColor;
 use inquire::Select;
 use regex::Regex;
