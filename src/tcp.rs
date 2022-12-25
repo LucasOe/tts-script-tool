@@ -1,4 +1,4 @@
-use crate::api::{Answer, AnswerError};
+use crate::api::{Answer, AnswerError, Message};
 use anyhow::{anyhow, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -7,7 +7,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 /// Sends a message to Tabletop Simulator and returns the answer as a Value::Object.
-pub fn send<T: Serialize>(message: &T) -> Result<()> {
+pub fn send<T: Serialize + Message>(message: &T) -> Result<()> {
     let msg = serde_json::to_string(&message)?;
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
@@ -24,7 +24,6 @@ pub fn read<T: DeserializeOwned + Answer>() -> Result<T> {
         let mut buffer = String::new();
         stream.read_to_string(&mut buffer).unwrap();
 
-        // Convert String into Value
         let message: Value = serde_json::from_str(&buffer)?;
         let message_id = get_message_id(&message);
 
