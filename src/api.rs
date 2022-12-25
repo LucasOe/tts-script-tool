@@ -4,26 +4,42 @@
 //! one where TTS listens for messages and one where ttsst listens for messages.
 //! All communication messages are JSON.
 
-use crate::tcp::send;
+use crate::tcp;
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 
-pub trait HasId {
-    const MESSAGE_ID: u8;
-}
-
 /////////////////////////////////////////////////////////////////////////////
+
+pub trait Message {
+    const MESSAGE_ID: u8;
+
+    fn send(&self) -> Result<()>
+    where
+        Self: Sized,
+        Self: Serialize,
+    {
+        tcp::send(self)
+    }
+}
 
 /// Get a list containing the states for every object. Returns an `AnswerReload` message.
 #[derive(Serialize, Debug, PartialEq)]
 pub struct MessageGetScripts {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
 }
 
-impl HasId for MessageGetScripts {
+impl Message for MessageGetScripts {
     const MESSAGE_ID: u8 = 0;
+}
+
+impl MessageGetScripts {
+    pub fn new() -> Self {
+        Self {
+            message_id: Self::MESSAGE_ID,
+        }
+    }
 }
 
 /// Update the Lua scripts and UI XML for any objects listed in the message,
@@ -36,13 +52,22 @@ impl HasId for MessageGetScripts {
 #[derive(Serialize, Debug, PartialEq)]
 pub struct MessageReload {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "scriptStates")]
     pub script_states: Value,
 }
 
-impl HasId for MessageReload {
+impl Message for MessageReload {
     const MESSAGE_ID: u8 = 1;
+}
+
+impl MessageReload {
+    pub fn new(script_states: Value) -> Self {
+        Self {
+            message_id: Self::MESSAGE_ID,
+            script_states,
+        }
+    }
 }
 
 /// Send a custom message to be forwarded to the `onExternalMessage` event handler
@@ -52,13 +77,22 @@ impl HasId for MessageReload {
 #[derive(Serialize, Debug, PartialEq)]
 pub struct MessageCustomMessage {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "customMessage")]
     pub custom_message: Value,
 }
 
-impl HasId for MessageCustomMessage {
+impl Message for MessageCustomMessage {
     const MESSAGE_ID: u8 = 2;
+}
+
+impl MessageCustomMessage {
+    pub fn new(custom_message: Value) -> Self {
+        Self {
+            message_id: Self::MESSAGE_ID,
+            custom_message,
+        }
+    }
 }
 
 /// Executes a lua script and returns the value in a `AnswerReturn` message.
@@ -66,7 +100,7 @@ impl HasId for MessageCustomMessage {
 #[derive(Serialize, Debug, PartialEq)]
 pub struct MessageExectute {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "returnID")]
     pub return_id: u8,
     #[serde(rename = "guid")]
@@ -75,11 +109,34 @@ pub struct MessageExectute {
     pub script: String,
 }
 
-impl HasId for MessageExectute {
+impl Message for MessageExectute {
     const MESSAGE_ID: u8 = 3;
 }
 
+impl MessageExectute {
+    pub fn new(script: String) -> Self {
+        Self {
+            message_id: Self::MESSAGE_ID,
+            return_id: 5,
+            guid: String::from("-1"),
+            script,
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////
+
+pub trait Answer {
+    const MESSAGE_ID: u8;
+
+    fn read() -> Result<Self>
+    where
+        Self: Sized,
+        Self: DeserializeOwned,
+    {
+        tcp::read()
+    }
+}
 
 /// When clicking on "Scripting Editor" in the right click contextual menu
 /// in TTS for an object that doesn't have a Lua Script yet, TTS will send
@@ -101,12 +158,12 @@ impl HasId for MessageExectute {
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerNewObject {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "scriptStates")]
     pub script_states: Value,
 }
 
-impl HasId for AnswerNewObject {
+impl Answer for AnswerNewObject {
     const MESSAGE_ID: u8 = 0;
 }
 
@@ -137,14 +194,14 @@ impl HasId for AnswerNewObject {
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerReload {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "savePath")]
     pub save_path: String,
     #[serde(rename = "scriptStates")]
     pub script_states: Value,
 }
 
-impl HasId for AnswerReload {
+impl Answer for AnswerReload {
     const MESSAGE_ID: u8 = 1;
 }
 
@@ -167,12 +224,12 @@ impl AnswerReload {
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerPrint {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "message")]
     pub message: String,
 }
 
-impl HasId for AnswerPrint {
+impl Answer for AnswerPrint {
     const MESSAGE_ID: u8 = 2;
 }
 
@@ -190,7 +247,7 @@ impl HasId for AnswerPrint {
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerError {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "error")]
     pub error: String,
     #[serde(rename = "guid")]
@@ -199,7 +256,7 @@ pub struct AnswerError {
     pub error_message_prefix: String,
 }
 
-impl HasId for AnswerError {
+impl Answer for AnswerError {
     const MESSAGE_ID: u8 = 3;
 }
 
@@ -215,12 +272,12 @@ impl HasId for AnswerError {
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerCustomMessage {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "customMessage")]
     pub custom_message: Value,
 }
 
-impl HasId for AnswerCustomMessage {
+impl Answer for AnswerCustomMessage {
     const MESSAGE_ID: u8 = 4;
 }
 
@@ -239,14 +296,14 @@ impl HasId for AnswerCustomMessage {
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerReturn {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "returnID")]
     pub return_id: u8,
     #[serde(rename = "returnValue")]
     pub return_value: Option<String>,
 }
 
-impl HasId for AnswerReturn {
+impl Answer for AnswerReturn {
     const MESSAGE_ID: u8 = 5;
 }
 
@@ -264,10 +321,10 @@ impl AnswerReturn {
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerGameSaved {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
 }
 
-impl HasId for AnswerGameSaved {
+impl Answer for AnswerGameSaved {
     const MESSAGE_ID: u8 = 6;
 }
 
@@ -283,28 +340,25 @@ impl HasId for AnswerGameSaved {
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct AnswerObjectCreated {
     #[serde(rename = "messageID")]
-    pub message_id: u8,
+    message_id: u8,
     #[serde(rename = "guid")]
     pub guid: String,
 }
 
-impl HasId for AnswerObjectCreated {
+impl Answer for AnswerObjectCreated {
     const MESSAGE_ID: u8 = 7;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 
 pub fn message_get_lua_scripts() -> Result<AnswerReload> {
-    send(&MessageGetScripts {
-        message_id: MessageGetScripts::MESSAGE_ID,
-    })
+    MessageGetScripts::new().send()?;
+    AnswerReload::read()
 }
 
 pub fn message_reload(script_states: Value) -> Result<AnswerReload> {
-    send(&MessageReload {
-        message_id: MessageReload::MESSAGE_ID,
-        script_states,
-    })
+    MessageReload::new(script_states).send()?;
+    AnswerReload::read()
 }
 
 /// Executes lua code inside Tabletop Simulator and returns the value.
@@ -320,12 +374,8 @@ macro_rules! execute {
 }
 
 pub fn message_execute(script: String) -> Result<AnswerReturn> {
-    send(&MessageExectute {
-        message_id: MessageExectute::MESSAGE_ID,
-        return_id: 5,
-        guid: String::from("-1"),
-        script,
-    })
+    MessageExectute::new(script).send()?;
+    AnswerReturn::read()
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -341,18 +391,15 @@ mod tests {
                 return JSON.encode("5")
             "#,
         );
-        let answer: AnswerReturn = send(&MessageExectute {
-            message_id: MessageExectute::MESSAGE_ID,
-            return_id: 5,
-            guid: String::from("-1"),
-            script,
-        })
-        .unwrap();
+
+        MessageExectute::new(script).send().unwrap();
+
+        let answer = AnswerReturn::read().unwrap();
         let expected_answer = AnswerReturn {
-            message_id: AnswerReturn::MESSAGE_ID,
+            message_id: 5,
             return_id: 5,
             return_value: Some("\"5\"".to_string()),
         };
-        assert_eq!(answer, expected_answer);
+        assert_eq!(answer, expected_answer)
     }
 }
