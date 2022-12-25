@@ -11,23 +11,26 @@ pub fn send<T: de::DeserializeOwned + HasId, U: Serialize>(message: &U) -> Resul
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
     stream.flush().unwrap();
-    // Wait for answer message with correct id and return it
-    let message = loop {
+
+    let answer = wait_for_answer(T::MESSAGE_ID)?;
+    Ok(serde_json::from_value(answer)?)
+}
+
+/// Waits for an answer with the correct id. Returns an Error if a message has an id of 3.
+fn wait_for_answer(expected_id: u8) -> Result<Value> {
+    loop {
         let message = read()?;
         let message_id = message["messageID"].as_u64().unwrap() as u8;
         if message_id == 3 {
-            bail!(message);
+            bail!(message)
         };
-        if message_id == T::MESSAGE_ID {
-            break message;
+        if message_id == expected_id {
+            break Ok(message);
         };
-    };
-
-    Ok(serde_json::from_value(message)?)
+    }
 }
 
 /// Listen for message
-// TODO: Add timeout when tabletop simulator doesn't accept listener
 fn read() -> Result<Value> {
     let listener = TcpListener::bind("127.0.0.1:39998")?;
     let (mut stream, _addr) = listener.accept()?;
