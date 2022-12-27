@@ -1,13 +1,11 @@
 use crate::api::{Answer, AnswerError, Message};
 use anyhow::{anyhow, Result};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use serde_json::Value;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 /// Sends a message to Tabletop Simulator and returns the answer as a Value::Object.
-pub fn send<T: Serialize + Message>(message: &T) -> Result<()> {
+pub fn send<T: Message>(message: &T) -> Result<()> {
     let msg = serde_json::to_string(&message)?;
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
@@ -17,7 +15,7 @@ pub fn send<T: Serialize + Message>(message: &T) -> Result<()> {
 }
 
 /// Waits for an answer with the correct id. Returns an Error if `AnswerError` is revieved.
-pub fn read<T: DeserializeOwned + Answer>() -> Result<T> {
+pub fn read<T: Answer>() -> Result<T> {
     let listener = TcpListener::bind("127.0.0.1:39998")?;
     let answer: Value = loop {
         let (mut stream, _addr) = listener.accept()?;

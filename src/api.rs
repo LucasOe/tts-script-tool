@@ -11,13 +11,12 @@ use serde_json::Value;
 
 /////////////////////////////////////////////////////////////////////////////
 
-pub trait Message {
+pub trait Message: Serialize {
     const MESSAGE_ID: u8;
 
     fn send(&self) -> Result<()>
     where
         Self: Sized,
-        Self: Serialize,
     {
         tcp::send(self)
     }
@@ -126,13 +125,12 @@ impl MessageExectute {
 
 /////////////////////////////////////////////////////////////////////////////
 
-pub trait Answer {
+pub trait Answer: DeserializeOwned {
     const MESSAGE_ID: u8;
 
     fn read() -> Result<Self>
     where
         Self: Sized,
-        Self: DeserializeOwned,
     {
         tcp::read()
     }
