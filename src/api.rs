@@ -41,6 +41,12 @@ impl MessageGetScripts {
     }
 }
 
+impl Default for MessageGetScripts {
+    fn default() -> Self {
+        MessageGetScripts::new()
+    }
+}
+
 /// Update the Lua scripts and UI XML for any objects listed in the message,
 /// and then reloads the save file, the same way it does when pressing "Save & Play" within the in-game editor.
 /// Returns an `AnswerReload` message.
@@ -311,7 +317,7 @@ impl AnswerReturn {
             .return_value
             .clone()
             .context("returnValue doesn't exist")?;
-        Ok(serde_json::from_str(&return_value)?)
+        Ok(serde_json::from_str(return_value)?)
     }
 }
 
