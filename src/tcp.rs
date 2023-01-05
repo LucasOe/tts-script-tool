@@ -41,7 +41,6 @@ pub fn read<T: HasId + DeserializeOwned>() -> Result<T> {
     Ok(serde_json::from_value(answer)?)
 }
 
-#[rustfmt::skip]
 pub fn read_any() -> Result<Box<dyn Answer>> {
     let listener = TcpListener::bind("127.0.0.1:39998")?;
     let (mut stream, _addr) = listener.accept()?;
@@ -60,7 +59,7 @@ pub fn read_any() -> Result<Box<dyn Answer>> {
         AnswerReturn::MESSAGE_ID => helper::<AnswerReturn>(message),
         AnswerGameSaved::MESSAGE_ID => helper::<AnswerGameSaved>(message),
         AnswerObjectCreated::MESSAGE_ID => helper::<AnswerObjectCreated>(message),
-        _ => bail!("Can't find id")
+        _ => bail!("Can't find id"),
     }
 }
 
