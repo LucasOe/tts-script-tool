@@ -52,16 +52,20 @@ pub fn read_any() -> Result<Box<dyn Answer>> {
     let message_id = get_message_id(&message);
 
     match message_id {
-        AnswerNewObject::MESSAGE_ID => Ok(Box::new(serde_json::from_value::<AnswerNewObject>(message)?)),
-        AnswerReload::MESSAGE_ID => Ok(Box::new(serde_json::from_value::<AnswerReload>(message)?)),
-        AnswerPrint::MESSAGE_ID => Ok(Box::new(serde_json::from_value::<AnswerPrint>(message)?)),
-        AnswerError::MESSAGE_ID => Ok(Box::new(serde_json::from_value::<AnswerError>(message)?)),
-        AnswerCustomMessage::MESSAGE_ID => Ok(Box::new(serde_json::from_value::<AnswerCustomMessage>(message)?)),
-        AnswerReturn::MESSAGE_ID => Ok(Box::new(serde_json::from_value::<AnswerReturn>(message)?)),
-        AnswerGameSaved::MESSAGE_ID => Ok(Box::new(serde_json::from_value::<AnswerGameSaved>(message)?)),
-        AnswerObjectCreated::MESSAGE_ID => Ok(Box::new(serde_json::from_value::<AnswerObjectCreated>(message)?)),
+        AnswerNewObject::MESSAGE_ID => helper::<AnswerNewObject>(message),
+        AnswerReload::MESSAGE_ID => helper::<AnswerReload>(message),
+        AnswerPrint::MESSAGE_ID => helper::<AnswerPrint>(message),
+        AnswerError::MESSAGE_ID => helper::<AnswerError>(message),
+        AnswerCustomMessage::MESSAGE_ID => helper::<AnswerCustomMessage>(message),
+        AnswerReturn::MESSAGE_ID => helper::<AnswerReturn>(message),
+        AnswerGameSaved::MESSAGE_ID => helper::<AnswerGameSaved>(message),
+        AnswerObjectCreated::MESSAGE_ID => helper::<AnswerObjectCreated>(message),
         _ => bail!("Can't find id")
     }
+}
+
+fn helper<T: Answer + DeserializeOwned + 'static>(answer: Value) -> Result<Box<dyn Answer>> {
+    Ok(Box::new(serde_json::from_value::<T>(answer).unwrap()))
 }
 
 fn get_message_id(message: &Value) -> u8 {

@@ -506,7 +506,9 @@ mod tests {
 
     #[test]
     fn test_any() {
-        let answer = answer_any().unwrap();
-        println!("{}", answer);
+        loop {
+            let answer = answer_any().unwrap();
+            println!("{}", answer);
+        }
     }
 }
