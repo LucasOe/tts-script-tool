@@ -18,7 +18,7 @@ impl ExternalEditorApi {
         Self {}
     }
 
-    fn send<T>(message: T)
+    fn send<T>(&self, message: T)
     where
         T: Serialize,
     {
@@ -28,7 +28,7 @@ impl ExternalEditorApi {
         stream.flush().unwrap();
     }
 
-    fn read() -> Result<Box<dyn JsonMessage>> {
+    pub fn read(&self) -> Result<Box<dyn JsonMessage>> {
         let listener = TcpListener::bind("127.0.0.1:39998")?;
         let (mut stream, _addr) = listener.accept()?;
         let mut buffer = String::new();
@@ -51,12 +51,12 @@ impl ExternalEditorApi {
     }
 
     /// Waits for an answer with the correct id and returns it
-    pub fn wait<T>() -> T
+    pub fn wait<T>(&self) -> T
     where
         T: MessageId + DeserializeOwned + Clone + 'static,
     {
         let answer = loop {
-            let answer = Self::read().unwrap();
+            let answer = self.read().unwrap();
             let message_id = answer.message_id();
             match message_id {
                 _ if message_id == T::MESSAGE_ID => break answer,
@@ -68,22 +68,22 @@ impl ExternalEditorApi {
     }
 
     pub fn get_scripts(&self) -> AnswerReload {
-        Self::send(MessageGetScripts::new());
-        Self::wait()
+        self.send(MessageGetScripts::new());
+        self.wait()
     }
 
     pub fn reload(&self, script_states: Value) -> AnswerReload {
-        Self::send(MessageReload::new(script_states));
-        Self::wait()
+        self.send(MessageReload::new(script_states));
+        self.wait()
     }
 
     pub fn custom_message(&self, message: Value) {
-        Self::send(MessageCustomMessage::new(message));
+        self.send(MessageCustomMessage::new(message));
     }
 
     pub fn execute(&self, script: String) -> AnswerReturn {
-        Self::send(MessageExectute::new(script));
-        Self::wait()
+        self.send(MessageExectute::new(script));
+        self.wait()
     }
 }
 
