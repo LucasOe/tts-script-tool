@@ -11,11 +11,14 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 #[derive(Debug)]
-pub struct ExternalEditorApi {}
+pub struct ExternalEditorApi {
+    listener: TcpListener,
+}
 
 impl ExternalEditorApi {
     pub fn new() -> Self {
-        Self {}
+        let listener = TcpListener::bind("127.0.0.1:39998").unwrap();
+        Self { listener }
     }
 
     fn send<T>(&self, message: T)
@@ -29,8 +32,7 @@ impl ExternalEditorApi {
     }
 
     pub fn read(&self) -> Result<Box<dyn JsonMessage>> {
-        let listener = TcpListener::bind("127.0.0.1:39998")?;
-        let (mut stream, _addr) = listener.accept()?;
+        let (mut stream, _addr) = self.listener.accept()?;
         let mut buffer = String::new();
         stream.read_to_string(&mut buffer).unwrap();
 
