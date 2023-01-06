@@ -1,7 +1,6 @@
-use crate::api::{Answer, AnswerError};
-use crate::{
-    AnswerCustomMessage, AnswerGameSaved, AnswerNewObject, AnswerObjectCreated, AnswerPrint,
-    AnswerReload, AnswerReturn, HasId,
+use crate::api::{
+    AnswerCustomMessage, AnswerError, AnswerGameSaved, AnswerNewObject, AnswerObjectCreated,
+    AnswerPrint, AnswerReload, AnswerReturn, IncomingMessage, JsonMessage, OutgoingMessage,
 };
 use anyhow::{anyhow, bail, Result};
 use serde::de::DeserializeOwned;
@@ -11,7 +10,10 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 /// Sends a message to Tabletop Simulator and returns the answer as a Value::Object.
-pub fn send<T: Serialize>(message: &T) -> Result<()> {
+pub fn send_message<T>(message: &T) -> Result<()>
+where
+    T: OutgoingMessage + Serialize,
+{
     let msg = serde_json::to_string(&message)?;
     let mut stream = TcpStream::connect("127.0.0.1:39999")?;
     stream.write_all(msg.as_bytes()).unwrap();
@@ -21,7 +23,10 @@ pub fn send<T: Serialize>(message: &T) -> Result<()> {
 }
 
 /// Waits for an answer with the correct id. Returns an Error if `AnswerError` is revieved.
-pub fn read<T: HasId + DeserializeOwned>() -> Result<T> {
+pub fn read_message<T>() -> Result<T>
+where
+    T: JsonMessage + IncomingMessage + DeserializeOwned,
+{
     let listener = TcpListener::bind("127.0.0.1:39998")?;
     let answer: Value = loop {
         let (mut stream, _addr) = listener.accept()?;
@@ -41,7 +46,7 @@ pub fn read<T: HasId + DeserializeOwned>() -> Result<T> {
     Ok(serde_json::from_value(answer)?)
 }
 
-pub fn read_any() -> Result<Box<dyn Answer>> {
+pub fn read() -> Result<Box<dyn IncomingMessage>> {
     let listener = TcpListener::bind("127.0.0.1:39998")?;
     let (mut stream, _addr) = listener.accept()?;
     let mut buffer = String::new();
@@ -63,7 +68,10 @@ pub fn read_any() -> Result<Box<dyn Answer>> {
     }
 }
 
-fn helper<T: Answer + DeserializeOwned + 'static>(answer: Value) -> Result<Box<dyn Answer>> {
+fn helper<T>(answer: Value) -> Result<Box<dyn IncomingMessage>>
+where
+    T: IncomingMessage + DeserializeOwned + 'static,
+{
     Ok(Box::new(serde_json::from_value::<T>(answer).unwrap()))
 }
 
