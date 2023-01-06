@@ -59,7 +59,10 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
     );
 
     api.send(MessageExectute::new(script))?;
-    let guid_tags = api.read::<AnswerReturn>()?.get_return_value()?;
+    let guid_tags = api
+        .read::<AnswerReturn>()?
+        .return_value()
+        .expect("No return value");
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
@@ -83,7 +86,7 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
     }
 
     // get scriptStates
-    let save_data = message_get_lua_scripts(api)?.get_script_states()?;
+    let save_data = message_get_lua_scripts(api)?.script_states();
     let script_states = save_data.as_array().unwrap();
 
     // add global script to script_list
@@ -150,7 +153,10 @@ fn set_tag(api: &mut ExternalEditorApi, file_name: &str, guid: &str) -> Result<S
     );
 
     api.send(MessageExectute::new(script))?;
-    let tags = api.read::<AnswerReturn>()?.get_return_value()?;
+    let tags = api
+        .read::<AnswerReturn>()?
+        .return_value()
+        .expect("No return value");
 
     // set new tags for object
     if let Value::Array(tags) = tags {
@@ -204,7 +210,10 @@ pub fn get_objects(api: &mut ExternalEditorApi) -> Result<Vec<Value>> {
     );
     api.send(MessageExectute::new(script))?;
 
-    let objects = api.read::<AnswerReturn>()?.get_return_value()?;
+    let objects = api
+        .read::<AnswerReturn>()?
+        .return_value()
+        .expect("No return value");
     Ok(objects.as_array().unwrap().to_owned())
 }
 
