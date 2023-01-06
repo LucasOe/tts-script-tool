@@ -4,15 +4,19 @@
 //! one where TTS listens for messages and one where ttsst listens for messages.
 //! All communication messages are JSON.
 
-use crate::tcp::read;
 pub use crate::tcp::ExternalEditorApi;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::fmt::{self, Display};
+use std::any::Any;
+use std::fmt::{self};
+
+pub trait MessageId {
+    const MESSAGE_ID: u8;
+}
 
 pub trait JsonMessage {
-    const MESSAGE_ID: u8;
+    fn message_id(&self) -> u8;
+    fn as_any(&self) -> &dyn Any;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -24,8 +28,18 @@ pub struct MessageGetScripts {
     message_id: u8,
 }
 
-impl JsonMessage for MessageGetScripts {
+impl MessageId for MessageGetScripts {
     const MESSAGE_ID: u8 = 0;
+}
+
+impl JsonMessage for MessageGetScripts {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for MessageGetScripts {
@@ -63,8 +77,18 @@ pub struct MessageReload {
     pub script_states: Value,
 }
 
-impl JsonMessage for MessageReload {
+impl MessageId for MessageReload {
     const MESSAGE_ID: u8 = 1;
+}
+
+impl JsonMessage for MessageReload {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for MessageReload {
@@ -94,8 +118,18 @@ pub struct MessageCustomMessage {
     pub custom_message: Value,
 }
 
-impl JsonMessage for MessageCustomMessage {
+impl MessageId for MessageCustomMessage {
     const MESSAGE_ID: u8 = 2;
+}
+
+impl JsonMessage for MessageCustomMessage {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for MessageCustomMessage {
@@ -127,8 +161,18 @@ pub struct MessageExectute {
     pub script: String,
 }
 
-impl JsonMessage for MessageExectute {
+impl MessageId for MessageExectute {
     const MESSAGE_ID: u8 = 3;
+}
+
+impl JsonMessage for MessageExectute {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for MessageExectute {
@@ -167,7 +211,7 @@ impl MessageExectute {
 ///     ]
 /// }
 /// ```
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct AnswerNewObject {
     #[serde(rename = "messageID")]
     message_id: u8,
@@ -175,8 +219,18 @@ pub struct AnswerNewObject {
     pub script_states: Value,
 }
 
-impl JsonMessage for AnswerNewObject {
+impl MessageId for AnswerNewObject {
     const MESSAGE_ID: u8 = 0;
+}
+
+impl JsonMessage for AnswerNewObject {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AnswerNewObject {
@@ -209,7 +263,7 @@ impl fmt::Display for AnswerNewObject {
 ///     ]
 /// }
 /// ```
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct AnswerReload {
     #[serde(rename = "messageID")]
     message_id: u8,
@@ -219,8 +273,18 @@ pub struct AnswerReload {
     pub script_states: Value,
 }
 
-impl JsonMessage for AnswerReload {
+impl MessageId for AnswerReload {
     const MESSAGE_ID: u8 = 1;
+}
+
+impl JsonMessage for AnswerReload {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AnswerReload {
@@ -244,7 +308,7 @@ impl AnswerReload {
 ///     "message": "Hit player! White"
 /// }
 /// ```
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct AnswerPrint {
     #[serde(rename = "messageID")]
     message_id: u8,
@@ -252,8 +316,18 @@ pub struct AnswerPrint {
     pub message: String,
 }
 
-impl JsonMessage for AnswerPrint {
+impl MessageId for AnswerPrint {
     const MESSAGE_ID: u8 = 2;
+}
+
+impl JsonMessage for AnswerPrint {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AnswerPrint {
@@ -273,7 +347,7 @@ impl fmt::Display for AnswerPrint {
 ///     "errorMessagePrefix": "Error in Global Script: "
 /// }
 /// ```
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct AnswerError {
     #[serde(rename = "messageID")]
     message_id: u8,
@@ -285,8 +359,18 @@ pub struct AnswerError {
     pub error_message_prefix: String,
 }
 
-impl JsonMessage for AnswerError {
+impl MessageId for AnswerError {
     const MESSAGE_ID: u8 = 3;
+}
+
+impl JsonMessage for AnswerError {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AnswerError {
@@ -304,7 +388,7 @@ impl fmt::Display for AnswerError {
 ///     "custom_message": { "foo": "Hello", "bar": "World"}
 /// }
 /// ```
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct AnswerCustomMessage {
     #[serde(rename = "messageID")]
     message_id: u8,
@@ -312,8 +396,18 @@ pub struct AnswerCustomMessage {
     pub custom_message: Value,
 }
 
-impl JsonMessage for AnswerCustomMessage {
+impl MessageId for AnswerCustomMessage {
     const MESSAGE_ID: u8 = 4;
+}
+
+impl JsonMessage for AnswerCustomMessage {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AnswerCustomMessage {
@@ -334,7 +428,7 @@ impl fmt::Display for AnswerCustomMessage {
 ///     "return_value": true
 /// }
 /// ```
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct AnswerReturn {
     #[serde(rename = "messageID")]
     message_id: u8,
@@ -344,8 +438,18 @@ pub struct AnswerReturn {
     pub return_value: Option<String>,
 }
 
-impl JsonMessage for AnswerReturn {
+impl MessageId for AnswerReturn {
     const MESSAGE_ID: u8 = 5;
+}
+
+impl JsonMessage for AnswerReturn {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AnswerReturn {
@@ -362,14 +466,24 @@ impl AnswerReturn {
 }
 
 /// Whenever the player saves the game in TTS, `AnswerGameSaved` is sent as a response.
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct AnswerGameSaved {
     #[serde(rename = "messageID")]
     message_id: u8,
 }
 
-impl JsonMessage for AnswerGameSaved {
+impl MessageId for AnswerGameSaved {
     const MESSAGE_ID: u8 = 6;
+}
+
+impl JsonMessage for AnswerGameSaved {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AnswerGameSaved {
@@ -395,35 +509,24 @@ pub struct AnswerObjectCreated {
     pub guid: String,
 }
 
-impl JsonMessage for AnswerObjectCreated {
+impl MessageId for AnswerObjectCreated {
     const MESSAGE_ID: u8 = 7;
+}
+
+impl JsonMessage for AnswerObjectCreated {
+    fn message_id(&self) -> u8 {
+        self.message_id
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AnswerObjectCreated {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Object Created")
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////
-
-pub fn message_get_lua_scripts(api: &mut ExternalEditorApi) -> Result<AnswerReload> {
-    api.send(MessageGetScripts::new())?;
-    api.read()
-}
-
-pub fn message_reload(api: &mut ExternalEditorApi, script_states: Value) -> Result<AnswerReload> {
-    api.send(MessageReload::new(script_states))?;
-    api.read()
-}
-
-pub fn message_execute(api: &mut ExternalEditorApi, script: String) -> Result<AnswerReturn> {
-    api.send(MessageExectute::new(script))?;
-    api.read()
-}
-
-pub fn answer_any() -> Result<Box<dyn Display>> {
-    read()
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -436,14 +539,8 @@ mod tests {
 
     #[test]
     fn test_execute() {
-        let mut api = ExternalEditorApi::new().unwrap();
-        api.send(MessageExectute::new(String::from(
-            "print(\"Foo\")\nreturn JSON.encode(\"5\")",
-        )))
-        .unwrap();
-
-        let answer = api.read::<AnswerReturn>().unwrap();
-
+        let api = ExternalEditorApi::new();
+        let answer = api.execute(String::from("print(\"Foo\")\nreturn JSON.encode(\"5\")"));
         let expected_answer = AnswerReturn {
             message_id: 5,
             return_id: 5,
@@ -454,17 +551,9 @@ mod tests {
 
     #[test]
     fn test_get_scripts() {
-        let mut api = ExternalEditorApi::new().unwrap();
-        let answer = message_get_lua_scripts(&mut api).unwrap();
+        let api = ExternalEditorApi::new();
+        let answer = api.get_scripts();
         let script_states = answer.script_states();
         println!("{:#?}", script_states);
-    }
-
-    #[test]
-    fn test_any() {
-        loop {
-            let answer = answer_any().unwrap();
-            println!("{}", answer);
-        }
     }
 }

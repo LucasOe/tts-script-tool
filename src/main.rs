@@ -47,7 +47,7 @@ fn main() {
 }
 
 fn run(args: Args) -> Result<()> {
-    let mut api = ExternalEditorApi::new()?;
+    let mut api = ExternalEditorApi::new();
     match args.command {
         Commands::Attach { path, guid } => attach(&mut api, &path, guid)?,
         Commands::Backup { path } => backup(&mut api, &path)?,

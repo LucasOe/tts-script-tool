@@ -33,7 +33,7 @@ pub fn attach(api: &mut ExternalEditorApi, path: &PathBuf, guid: Option<String>)
         );
         let file_content = fs::read_to_string(path)?;
         set_script(api, &guid, &file_content, &tag)?;
-        message_reload(api, json!([]))?;
+        api.reload(json!([]));
         println!("{}", "reloaded save!".green().bold());
         set_tag(api, file_name, &guid)?;
         println!("To save the appied tag it is recommended to save the game before reloading.");
@@ -58,11 +58,7 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
         "#,
     );
 
-    api.send(MessageExectute::new(script))?;
-    let guid_tags = api
-        .read::<AnswerReturn>()?
-        .return_value()
-        .expect("No return value");
+    let guid_tags = api.execute(script).return_value().expect("No return value");
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
@@ -86,7 +82,7 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
     }
 
     // get scriptStates
-    let save_data = message_get_lua_scripts(api)?.script_states();
+    let save_data = api.get_scripts().script_states();
     let script_states = save_data.as_array().unwrap();
 
     // add global script to script_list
@@ -105,7 +101,7 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
         "script": global_script,
         "ui": global_ui
     }]);
-    message_reload(api, message)?;
+    api.reload(message);
     println!("{}", "reloaded save!".green().bold());
 
     Ok(())
@@ -115,7 +111,7 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
 pub fn backup(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
     let mut path = PathBuf::from(path);
     path.set_extension("json");
-    let save_path = message_get_lua_scripts(api)?.save_path;
+    let save_path = api.get_scripts().save_path;
     fs::copy(&save_path, &path)?;
     println!(
         "{} \"{save_name}\" as \"{path}\"",
@@ -152,11 +148,7 @@ fn set_tag(api: &mut ExternalEditorApi, file_name: &str, guid: &str) -> Result<S
         "#,
     );
 
-    api.send(MessageExectute::new(script))?;
-    let tags = api
-        .read::<AnswerReturn>()?
-        .return_value()
-        .expect("No return value");
+    let tags = api.execute(script).return_value().expect("No return value");
 
     // set new tags for object
     if let Value::Array(tags) = tags {
@@ -169,7 +161,7 @@ fn set_tag(api: &mut ExternalEditorApi, file_name: &str, guid: &str) -> Result<S
             "#,
             tags = json!(tags).to_string().escape_default(),
         );
-        api.send(MessageExectute::new(script))?;
+        api.execute(script);
 
         Ok(tag)
     } else {
@@ -191,7 +183,7 @@ fn set_script(api: &mut ExternalEditorApi, guid: &str, script: &str, tag: &str) 
         "#,
         script.escape_default()
     );
-    api.send(MessageExectute::new(script))?;
+    api.execute(script);
 
     println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
     Ok(())
@@ -208,12 +200,7 @@ pub fn get_objects(api: &mut ExternalEditorApi) -> Result<Vec<Value>> {
             return JSON.encode(list)
         "#,
     );
-    api.send(MessageExectute::new(script))?;
-
-    let objects = api
-        .read::<AnswerReturn>()?
-        .return_value()
-        .expect("No return value");
+    let objects = api.execute(script).return_value().expect("No return value");
     Ok(objects.as_array().unwrap().to_owned())
 }
 

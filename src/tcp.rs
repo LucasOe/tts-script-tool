@@ -1,86 +1,95 @@
 use crate::api::{
     AnswerCustomMessage, AnswerError, AnswerGameSaved, AnswerNewObject, AnswerObjectCreated,
-    AnswerPrint, AnswerReload, AnswerReturn, JsonMessage,
+    AnswerPrint, AnswerReload, AnswerReturn, MessageId,
 };
-use anyhow::{anyhow, bail, Result};
+use crate::{JsonMessage, MessageCustomMessage, MessageExectute, MessageGetScripts, MessageReload};
+use anyhow::{bail, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
-use std::fmt::Display;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 #[derive(Debug)]
-pub struct ExternalEditorApi {
-    listener: TcpListener,
-}
+pub struct ExternalEditorApi {}
 
 impl ExternalEditorApi {
-    pub fn new() -> Result<Self> {
-        let server = TcpListener::bind("127.0.0.1:39998")?;
-        Ok(Self { listener: server })
+    pub fn new() -> Self {
+        Self {}
     }
 
-    /// Sends a message to Tabletop Simulator
-    pub fn send<T>(&mut self, message: T) -> Result<()>
+    fn send<T>(message: T)
     where
         T: Serialize,
     {
-        let json_message = serde_json::to_string(&message)?;
-        let mut stream = TcpStream::connect("127.0.0.1:39999")?;
-        stream.write_all(json_message.as_bytes())?;
-        stream.flush()?;
-        Ok(())
+        let json_message = serde_json::to_string(&message).unwrap();
+        let mut stream = TcpStream::connect("127.0.0.1:39999").unwrap();
+        stream.write_all(json_message.as_bytes()).unwrap();
+        stream.flush().unwrap();
     }
 
-    /// Waits for an answer with the correct id. Returns an Error if `AnswerError` is revieved.
-    pub fn read<T>(&mut self) -> Result<T>
+    fn read() -> Result<Box<dyn JsonMessage>> {
+        let listener = TcpListener::bind("127.0.0.1:39998")?;
+        let (mut stream, _addr) = listener.accept()?;
+        let mut buffer = String::new();
+        stream.read_to_string(&mut buffer).unwrap();
+
+        let message: Value = serde_json::from_str(&buffer)?;
+        let message_id = get_message_id(&message);
+
+        match message_id {
+            AnswerNewObject::MESSAGE_ID => helper::<AnswerNewObject>(message),
+            AnswerReload::MESSAGE_ID => helper::<AnswerReload>(message),
+            AnswerPrint::MESSAGE_ID => helper::<AnswerPrint>(message),
+            AnswerError::MESSAGE_ID => helper::<AnswerError>(message),
+            AnswerCustomMessage::MESSAGE_ID => helper::<AnswerCustomMessage>(message),
+            AnswerReturn::MESSAGE_ID => helper::<AnswerReturn>(message),
+            AnswerGameSaved::MESSAGE_ID => helper::<AnswerGameSaved>(message),
+            AnswerObjectCreated::MESSAGE_ID => helper::<AnswerObjectCreated>(message),
+            _ => bail!("Can't find id"),
+        }
+    }
+
+    /// Waits for an answer with the correct id and returns it
+    pub fn wait<T>() -> T
     where
-        T: JsonMessage + DeserializeOwned,
+        T: MessageId + DeserializeOwned + Clone + 'static,
     {
-        let answer: Value = loop {
-            let (mut stream, _addr) = self.listener.accept()?;
-            let mut buffer = String::new();
-            stream.read_to_string(&mut buffer).unwrap();
-
-            let message: Value = serde_json::from_str(&buffer)?;
-            let message_id = get_message_id(&message);
-
+        let answer = loop {
+            let answer = Self::read().unwrap();
+            let message_id = answer.message_id();
             match message_id {
-                _ if message_id == T::MESSAGE_ID => break Ok(message),
-                AnswerError::MESSAGE_ID => break Err(anyhow!(message)),
-                _ => continue,
-            };
-        }?;
-        Ok(serde_json::from_value(answer)?)
+                _ if message_id == T::MESSAGE_ID => break answer,
+                _ => {}
+            }
+        };
+        let downcast = answer.as_any().downcast_ref::<T>().unwrap();
+        downcast.clone()
+    }
+
+    pub fn get_scripts(&self) -> AnswerReload {
+        Self::send(MessageGetScripts::new());
+        Self::wait()
+    }
+
+    pub fn reload(&self, script_states: Value) -> AnswerReload {
+        Self::send(MessageReload::new(script_states));
+        Self::wait()
+    }
+
+    pub fn custom_message(&self, message: Value) {
+        Self::send(MessageCustomMessage::new(message));
+    }
+
+    pub fn execute(&self, script: String) -> AnswerReturn {
+        Self::send(MessageExectute::new(script));
+        Self::wait()
     }
 }
 
-pub fn read() -> Result<Box<dyn Display>> {
-    let listener = TcpListener::bind("127.0.0.1:39998")?;
-    let (mut stream, _addr) = listener.accept()?;
-    let mut buffer = String::new();
-    stream.read_to_string(&mut buffer).unwrap();
-
-    let message: Value = serde_json::from_str(&buffer)?;
-    let message_id = get_message_id(&message);
-
-    match message_id {
-        AnswerNewObject::MESSAGE_ID => helper::<AnswerNewObject>(message),
-        AnswerReload::MESSAGE_ID => helper::<AnswerReload>(message),
-        AnswerPrint::MESSAGE_ID => helper::<AnswerPrint>(message),
-        AnswerError::MESSAGE_ID => helper::<AnswerError>(message),
-        AnswerCustomMessage::MESSAGE_ID => helper::<AnswerCustomMessage>(message),
-        AnswerReturn::MESSAGE_ID => helper::<AnswerReturn>(message),
-        AnswerGameSaved::MESSAGE_ID => helper::<AnswerGameSaved>(message),
-        AnswerObjectCreated::MESSAGE_ID => helper::<AnswerObjectCreated>(message),
-        _ => bail!("Can't find id"),
-    }
-}
-
-fn helper<T>(answer: Value) -> Result<Box<dyn Display>>
+fn helper<T>(answer: Value) -> Result<Box<dyn JsonMessage>>
 where
-    T: Display + DeserializeOwned + 'static,
+    T: JsonMessage + DeserializeOwned + 'static,
 {
     Ok(Box::new(serde_json::from_value::<T>(answer).unwrap()))
 }
