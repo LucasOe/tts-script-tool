@@ -4,9 +4,10 @@
 //! one where TTS listens for messages and one where ttsst listens for messages.
 //! All communication messages are JSON.
 
-use crate::tcp::{self, read};
+use crate::tcp::read;
+pub use crate::tcp::ExternalEditorApi;
 use anyhow::{Context, Result};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::{self, Display};
 
@@ -15,15 +16,6 @@ pub trait JsonMessage {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-
-pub trait OutgoingMessage: Display {
-    fn send(&self) -> Result<()>
-    where
-        Self: Sized + Serialize + JsonMessage,
-    {
-        tcp::send_message(self)
-    }
-}
 
 /// Get a list containing the states for every object. Returns an `AnswerReload` message.
 #[derive(Serialize, Debug, PartialEq)]
@@ -41,8 +33,6 @@ impl fmt::Display for MessageGetScripts {
         write!(f, "Get Scripts")
     }
 }
-
-impl OutgoingMessage for MessageGetScripts {}
 
 impl MessageGetScripts {
     pub fn new() -> Self {
@@ -83,8 +73,6 @@ impl fmt::Display for MessageReload {
     }
 }
 
-impl OutgoingMessage for MessageReload {}
-
 impl MessageReload {
     pub fn new(script_states: Value) -> Self {
         Self {
@@ -115,8 +103,6 @@ impl fmt::Display for MessageCustomMessage {
         write!(f, "Custom Message")
     }
 }
-
-impl OutgoingMessage for MessageCustomMessage {}
 
 impl MessageCustomMessage {
     pub fn new(custom_message: Value) -> Self {
@@ -151,8 +137,6 @@ impl fmt::Display for MessageExectute {
     }
 }
 
-impl OutgoingMessage for MessageExectute {}
-
 impl MessageExectute {
     pub fn new(script: String) -> Self {
         Self {
@@ -165,15 +149,6 @@ impl MessageExectute {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-
-pub trait IncomingMessage: Display {
-    fn read() -> Result<Self>
-    where
-        Self: Sized + DeserializeOwned + JsonMessage,
-    {
-        tcp::read_message()
-    }
-}
 
 /// When clicking on "Scripting Editor" in the right click contextual menu
 /// in TTS for an object that doesn't have a Lua Script yet, TTS will send
@@ -209,8 +184,6 @@ impl fmt::Display for AnswerNewObject {
         write!(f, "New Object")
     }
 }
-
-impl IncomingMessage for AnswerNewObject {}
 
 /// After loading a new game in TTS, TTS will send all the Lua scripts
 /// and UI XML from the new game as an `AnswerReload`.
@@ -256,8 +229,6 @@ impl fmt::Display for AnswerReload {
     }
 }
 
-impl IncomingMessage for AnswerReload {}
-
 impl AnswerReload {
     pub fn get_script_states(&self) -> Result<Value> {
         let script_states = &self.script_states;
@@ -292,8 +263,6 @@ impl fmt::Display for AnswerPrint {
     }
 }
 
-impl IncomingMessage for AnswerPrint {}
-
 /// TTS sends all error messages in a `AnswerError` response.
 ///
 /// # Example
@@ -327,8 +296,6 @@ impl fmt::Display for AnswerError {
     }
 }
 
-impl IncomingMessage for AnswerError {}
-
 /// Custom Messages are sent by calling `sendExternalMessage` with the table of data you wish to send.
 ///
 /// # Example
@@ -355,8 +322,6 @@ impl fmt::Display for AnswerCustomMessage {
         write!(f, "Custom Message")
     }
 }
-
-impl IncomingMessage for AnswerCustomMessage {}
 
 /// If code executed with a `MessageExecute` message returns a value,
 /// it will be sent back in a `AnswerReturn` message.
@@ -390,8 +355,6 @@ impl fmt::Display for AnswerReturn {
     }
 }
 
-impl IncomingMessage for AnswerReturn {}
-
 impl AnswerReturn {
     pub fn get_return_value(&self) -> Result<Value> {
         let return_value = &self
@@ -418,8 +381,6 @@ impl fmt::Display for AnswerGameSaved {
         write!(f, "Game Saved")
     }
 }
-
-impl IncomingMessage for AnswerGameSaved {}
 
 /// Whenever the player saves the game in TTS, `AnswerObjectCreated` is sent as a response.
 ///
@@ -448,38 +409,24 @@ impl fmt::Display for AnswerObjectCreated {
     }
 }
 
-impl IncomingMessage for AnswerObjectCreated {}
-
 /////////////////////////////////////////////////////////////////////////////
 
-pub fn message_get_lua_scripts() -> Result<AnswerReload> {
-    MessageGetScripts::new().send()?;
-    AnswerReload::read()
+pub fn message_get_lua_scripts(api: &mut ExternalEditorApi) -> Result<AnswerReload> {
+    api.send(MessageGetScripts::new())?;
+    api.read()
 }
 
-pub fn message_reload(script_states: Value) -> Result<AnswerReload> {
-    MessageReload::new(script_states).send()?;
-    AnswerReload::read()
+pub fn message_reload(api: &mut ExternalEditorApi, script_states: Value) -> Result<AnswerReload> {
+    api.send(MessageReload::new(script_states))?;
+    api.read()
 }
 
-/// Executes lua code inside Tabletop Simulator and returns the value.
-///
-/// This macro uses the same syntax as `format`.
-/// The first argument `execute!` receives is a format string. This must be a string literal.
-/// To use special characters without escaping use raw string literals.
-#[macro_export]
-macro_rules! execute {
-    ($($arg:tt)+) => {
-        message_execute(format!($($arg)+))?
-    };
+pub fn message_execute(api: &mut ExternalEditorApi, script: String) -> Result<AnswerReturn> {
+    api.send(MessageExectute::new(script))?;
+    api.read()
 }
 
-pub fn message_execute(script: String) -> Result<AnswerReturn> {
-    MessageExectute::new(script).send()?;
-    AnswerReturn::read()
-}
-
-pub fn answer_any() -> Result<Box<dyn IncomingMessage>> {
+pub fn answer_any() -> Result<Box<dyn Display>> {
     read()
 }
 
@@ -493,11 +440,14 @@ mod tests {
 
     #[test]
     fn test_execute() {
-        MessageExectute::new(String::from("return JSON.encode('5)"))
-            .send()
-            .unwrap();
+        let mut api = ExternalEditorApi::new().unwrap();
+        api.send(MessageExectute::new(String::from(
+            "print(\"Foo\")\nreturn JSON.encode(\"5\")",
+        )))
+        .unwrap();
 
-        let answer = AnswerReturn::read().unwrap();
+        let answer = api.read::<AnswerReturn>().unwrap();
+
         let expected_answer = AnswerReturn {
             message_id: 5,
             return_id: 5,
@@ -507,10 +457,11 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_message() {
-        MessageCustomMessage::new(json!({"foo": "foo","bar": "bar"}))
-            .send()
-            .unwrap();
+    fn test_get_scripts() {
+        let mut api = ExternalEditorApi::new().unwrap();
+        let answer = message_get_lua_scripts(&mut api).unwrap();
+        let script_states = answer.get_script_states().unwrap();
+        println!("{:#?}", script_states);
     }
 
     #[test]
