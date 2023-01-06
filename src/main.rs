@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
 use std::path::PathBuf;
-use ttsst::{attach, backup, reload};
+use ttsst::{attach, backup, reload, ExternalEditorApi};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -47,10 +47,11 @@ fn main() {
 }
 
 fn run(args: Args) -> Result<()> {
+    let mut api = ExternalEditorApi::new()?;
     match args.command {
-        Commands::Attach { path, guid } => attach(&path, guid)?,
-        Commands::Backup { path } => backup(&path)?,
-        Commands::Reload { path } => reload(&path)?,
+        Commands::Attach { path, guid } => attach(&mut api, &path, guid)?,
+        Commands::Backup { path } => backup(&mut api, &path)?,
+        Commands::Reload { path } => reload(&mut api, &path)?,
     }
     Ok(())
 }

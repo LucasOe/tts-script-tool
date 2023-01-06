@@ -18,24 +18,24 @@ struct Tags {
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
-pub fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
+pub fn attach(api: &mut ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> Result<()> {
     let path = Path::new(path);
     if path.exists() && path.is_file() {
         let file_name = path.file_name().unwrap().to_str().unwrap();
         let guid = match guid {
             Some(guid) => guid,
-            None => select_object()?,
+            None => select_object(api)?,
         };
-        let tag = set_tag(file_name, &guid)?;
+        let tag = set_tag(api, file_name, &guid)?;
         println!(
             "{} \"{tag}\" as a tag for \"{guid}\"",
             "added:".yellow().bold()
         );
         let file_content = fs::read_to_string(path)?;
-        set_script(&guid, &file_content, &tag)?;
-        message_reload(json!([]))?;
+        set_script(api, &guid, &file_content, &tag)?;
+        message_reload(api, json!([]))?;
         println!("{}", "reloaded save!".green().bold());
-        set_tag(file_name, &guid)?;
+        set_tag(api, file_name, &guid)?;
         println!("To save the appied tag it is recommended to save the game before reloading.");
     } else {
         bail!("{:?} is not a file", path)
@@ -44,9 +44,9 @@ pub fn attach(path: &PathBuf, guid: Option<String>) -> Result<()> {
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(path: &PathBuf) -> Result<()> {
+pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
     // map tags to guids
-    let guid_tags = execute!(
+    let script = format!(
         r#"
             list = {{}}
             for _, obj in pairs(getAllObjects()) do
@@ -56,8 +56,10 @@ pub fn reload(path: &PathBuf) -> Result<()> {
             end
             return JSON.encode(list)
         "#,
-    )
-    .get_return_value()?;
+    );
+
+    api.send(MessageExectute::new(script))?;
+    let guid_tags = api.read::<AnswerReturn>()?.get_return_value()?;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
@@ -74,14 +76,14 @@ pub fn reload(path: &PathBuf) -> Result<()> {
                 if let Some(tag) = valid_tag {
                     let file_path = get_file_from_tag(path, &tag, &guid)?;
                     let file_content = fs::read_to_string(file_path)?;
-                    set_script(&guid, &file_content, &tag)?;
+                    set_script(api, &guid, &file_content, &tag)?;
                 }
             }
         }
     }
 
     // get scriptStates
-    let save_data = message_get_lua_scripts()?.get_script_states()?;
+    let save_data = message_get_lua_scripts(api)?.get_script_states()?;
     let script_states = save_data.as_array().unwrap();
 
     // add global script to script_list
@@ -100,17 +102,17 @@ pub fn reload(path: &PathBuf) -> Result<()> {
         "script": global_script,
         "ui": global_ui
     }]);
-    message_reload(message)?;
+    message_reload(api, message)?;
     println!("{}", "reloaded save!".green().bold());
 
     Ok(())
 }
 
 /// Backup current save as file
-pub fn backup(path: &PathBuf) -> Result<()> {
+pub fn backup(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
     let mut path = PathBuf::from(path);
     path.set_extension("json");
-    let save_path = message_get_lua_scripts()?.save_path;
+    let save_path = message_get_lua_scripts(api)?.save_path;
     fs::copy(&save_path, &path)?;
     println!(
         "{} \"{save_name}\" as \"{path}\"",
@@ -122,8 +124,8 @@ pub fn backup(path: &PathBuf) -> Result<()> {
 }
 
 /// Shows the user a list of all objects in the save to select from.
-fn select_object() -> Result<String> {
-    let objects = get_objects()?;
+fn select_object(api: &mut ExternalEditorApi) -> Result<String> {
+    let objects = get_objects(api)?;
     let selection = Select::new("Select the object to attach the script to:", objects).prompt();
     match selection {
         Ok(selection) => Ok(unescape_value(&selection)),
@@ -133,31 +135,36 @@ fn select_object() -> Result<String> {
 
 /// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
-fn set_tag(file_name: &str, guid: &str) -> Result<String> {
+fn set_tag(api: &mut ExternalEditorApi, file_name: &str, guid: &str) -> Result<String> {
     // check if guid exists
-    let objects = get_objects()?;
+    let objects = get_objects(api)?;
     if !objects.contains(&json!(&guid)) {
         bail!("\"{guid}\" does not exist")
     }
     // get existing tags for object
     let tag = format!("scripts/{file_name}");
-    let tags = execute!(
+    let script = format!(
         r#"
             return JSON.encode(getObjectFromGUID("{guid}").getTags())
         "#,
-    )
-    .get_return_value()?;
+    );
+
+    api.send(MessageExectute::new(script))?;
+    let tags = api.read::<AnswerReturn>()?.get_return_value()?;
+
     // set new tags for object
     if let Value::Array(tags) = tags {
         let mut tags = get_valid_tags(tags).invalid;
         tags.push(Value::String(String::from(&tag)));
-        execute!(
+        let script = format!(
             r#"
                 tags = JSON.decode("{tags}")
                 getObjectFromGUID("{guid}").setTags(tags)
             "#,
             tags = json!(tags).to_string().escape_default(),
         );
+        api.send(MessageExectute::new(script))?;
+
         Ok(tag)
     } else {
         bail!("could not set tag for \"{guid}\"")
@@ -165,26 +172,28 @@ fn set_tag(file_name: &str, guid: &str) -> Result<String> {
 }
 
 /// Sets the script for the object.
-fn set_script(guid: &str, script: &str, tag: &str) -> Result<()> {
+fn set_script(api: &mut ExternalEditorApi, guid: &str, script: &str, tag: &str) -> Result<()> {
     // check if guid exists
-    let objects = get_objects()?;
+    let objects = get_objects(api)?;
     if !objects.contains(&json!(&guid)) {
         bail!("\"{guid}\" does not exist")
     }
     // add lua script for object
-    execute!(
+    let script = format!(
         r#"
             return JSON.encode(getObjectFromGUID("{guid}").setLuaScript("{}"))
         "#,
         script.escape_default()
     );
+    api.send(MessageExectute::new(script))?;
+
     println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
     Ok(())
 }
 
 /// Returns a list of all guids
-pub fn get_objects() -> Result<Vec<Value>> {
-    Ok(execute!(
+pub fn get_objects(api: &mut ExternalEditorApi) -> Result<Vec<Value>> {
+    let script = format!(
         r#"
             list = {{}}
             for _, obj in pairs(getAllObjects()) do
@@ -192,11 +201,11 @@ pub fn get_objects() -> Result<Vec<Value>> {
             end
             return JSON.encode(list)
         "#,
-    )
-    .get_return_value()?
-    .as_array()
-    .unwrap()
-    .to_owned())
+    );
+    api.send(MessageExectute::new(script))?;
+
+    let objects = api.read::<AnswerReturn>()?.get_return_value()?;
+    Ok(objects.as_array().unwrap().to_owned())
 }
 
 /// Split the tags into valid and non valid tags
