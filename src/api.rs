@@ -487,11 +487,13 @@ pub fn answer_any() -> Result<Box<dyn IncomingMessage>> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use crate::api::*;
 
     #[test]
     fn test_execute() {
-        MessageExectute::new(String::from("return JSON.encode(\"5\")"))
+        MessageExectute::new(String::from("return JSON.encode('5)"))
             .send()
             .unwrap();
 
@@ -502,6 +504,13 @@ mod tests {
             return_value: Some("\"5\"".to_string()),
         };
         assert_eq!(answer, expected_answer)
+    }
+
+    #[test]
+    fn test_custom_message() {
+        MessageCustomMessage::new(json!({"foo": "foo","bar": "bar"}))
+            .send()
+            .unwrap();
     }
 
     #[test]
