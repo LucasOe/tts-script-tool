@@ -8,13 +8,13 @@ pub use crate::tcp::ExternalEditorApi;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::any::Any;
-use std::fmt::{self};
+use std::fmt::{self, Display};
 
 pub trait MessageId {
     const MESSAGE_ID: u8;
 }
 
-pub trait JsonMessage {
+pub trait JsonMessage: Display {
     fn message_id(&self) -> u8;
     fn as_any(&self) -> &dyn Any;
 }
@@ -555,5 +555,14 @@ mod tests {
         let answer = api.get_scripts();
         let script_states = answer.script_states();
         println!("{:#?}", script_states);
+    }
+
+    #[test]
+    fn test_read() {
+        let api = ExternalEditorApi::new();
+        loop {
+            let answer = api.read().unwrap();
+            println!("{}", answer);
+        }
     }
 }
