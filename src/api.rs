@@ -6,7 +6,7 @@
 
 use crate::tcp::read;
 pub use crate::tcp::ExternalEditorApi;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::{self, Display};
@@ -230,9 +230,8 @@ impl fmt::Display for AnswerReload {
 }
 
 impl AnswerReload {
-    pub fn get_script_states(&self) -> Result<Value> {
-        let script_states = &self.script_states;
-        Ok(script_states.clone())
+    pub fn script_states(&self) -> Value {
+        self.script_states.clone()
     }
 }
 
@@ -356,12 +355,9 @@ impl fmt::Display for AnswerReturn {
 }
 
 impl AnswerReturn {
-    pub fn get_return_value(&self) -> Result<Value> {
-        let return_value = &self
-            .return_value
-            .clone()
-            .context("returnValue doesn't exist")?;
-        Ok(serde_json::from_str(return_value)?)
+    pub fn return_value(&self) -> Option<Value> {
+        let return_value = self.return_value.clone()?;
+        serde_json::from_str(&return_value).expect("Return value is not valid json")
     }
 }
 
@@ -460,7 +456,7 @@ mod tests {
     fn test_get_scripts() {
         let mut api = ExternalEditorApi::new().unwrap();
         let answer = message_get_lua_scripts(&mut api).unwrap();
-        let script_states = answer.get_script_states().unwrap();
+        let script_states = answer.script_states();
         println!("{:#?}", script_states);
     }
 
