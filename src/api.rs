@@ -4,24 +4,24 @@
 //! one where TTS listens for messages and one where ttsst listens for messages.
 //! All communication messages are JSON.
 
-use crate::tcp::{self, read_any};
+use crate::tcp::{self, read};
 use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::{self, Display};
 
-pub trait HasId {
+pub trait JsonMessage {
     const MESSAGE_ID: u8;
 }
 
 /////////////////////////////////////////////////////////////////////////////
 
-pub trait Message: Display {
+pub trait OutgoingMessage: Display {
     fn send(&self) -> Result<()>
     where
-        Self: Sized + Serialize + HasId,
+        Self: Sized + Serialize + JsonMessage,
     {
-        tcp::send(self)
+        tcp::send_message(self)
     }
 }
 
@@ -32,7 +32,7 @@ pub struct MessageGetScripts {
     message_id: u8,
 }
 
-impl HasId for MessageGetScripts {
+impl JsonMessage for MessageGetScripts {
     const MESSAGE_ID: u8 = 0;
 }
 
@@ -42,7 +42,7 @@ impl fmt::Display for MessageGetScripts {
     }
 }
 
-impl Message for MessageGetScripts {}
+impl OutgoingMessage for MessageGetScripts {}
 
 impl MessageGetScripts {
     pub fn new() -> Self {
@@ -73,7 +73,7 @@ pub struct MessageReload {
     pub script_states: Value,
 }
 
-impl HasId for MessageReload {
+impl JsonMessage for MessageReload {
     const MESSAGE_ID: u8 = 1;
 }
 
@@ -83,7 +83,7 @@ impl fmt::Display for MessageReload {
     }
 }
 
-impl Message for MessageReload {}
+impl OutgoingMessage for MessageReload {}
 
 impl MessageReload {
     pub fn new(script_states: Value) -> Self {
@@ -106,7 +106,7 @@ pub struct MessageCustomMessage {
     pub custom_message: Value,
 }
 
-impl HasId for MessageCustomMessage {
+impl JsonMessage for MessageCustomMessage {
     const MESSAGE_ID: u8 = 2;
 }
 
@@ -116,7 +116,7 @@ impl fmt::Display for MessageCustomMessage {
     }
 }
 
-impl Message for MessageCustomMessage {}
+impl OutgoingMessage for MessageCustomMessage {}
 
 impl MessageCustomMessage {
     pub fn new(custom_message: Value) -> Self {
@@ -141,7 +141,7 @@ pub struct MessageExectute {
     pub script: String,
 }
 
-impl HasId for MessageExectute {
+impl JsonMessage for MessageExectute {
     const MESSAGE_ID: u8 = 3;
 }
 
@@ -151,7 +151,7 @@ impl fmt::Display for MessageExectute {
     }
 }
 
-impl Message for MessageExectute {}
+impl OutgoingMessage for MessageExectute {}
 
 impl MessageExectute {
     pub fn new(script: String) -> Self {
@@ -166,12 +166,12 @@ impl MessageExectute {
 
 /////////////////////////////////////////////////////////////////////////////
 
-pub trait Answer: Display {
+pub trait IncomingMessage: Display {
     fn read() -> Result<Self>
     where
-        Self: Sized + DeserializeOwned + HasId,
+        Self: Sized + DeserializeOwned + JsonMessage,
     {
-        tcp::read()
+        tcp::read_message()
     }
 }
 
@@ -200,7 +200,7 @@ pub struct AnswerNewObject {
     pub script_states: Value,
 }
 
-impl HasId for AnswerNewObject {
+impl JsonMessage for AnswerNewObject {
     const MESSAGE_ID: u8 = 0;
 }
 
@@ -210,7 +210,7 @@ impl fmt::Display for AnswerNewObject {
     }
 }
 
-impl Answer for AnswerNewObject {}
+impl IncomingMessage for AnswerNewObject {}
 
 /// After loading a new game in TTS, TTS will send all the Lua scripts
 /// and UI XML from the new game as an `AnswerReload`.
@@ -246,7 +246,7 @@ pub struct AnswerReload {
     pub script_states: Value,
 }
 
-impl HasId for AnswerReload {
+impl JsonMessage for AnswerReload {
     const MESSAGE_ID: u8 = 1;
 }
 
@@ -256,7 +256,7 @@ impl fmt::Display for AnswerReload {
     }
 }
 
-impl Answer for AnswerReload {}
+impl IncomingMessage for AnswerReload {}
 
 impl AnswerReload {
     pub fn get_script_states(&self) -> Result<Value> {
@@ -282,7 +282,7 @@ pub struct AnswerPrint {
     pub message: String,
 }
 
-impl HasId for AnswerPrint {
+impl JsonMessage for AnswerPrint {
     const MESSAGE_ID: u8 = 2;
 }
 
@@ -292,7 +292,7 @@ impl fmt::Display for AnswerPrint {
     }
 }
 
-impl Answer for AnswerPrint {}
+impl IncomingMessage for AnswerPrint {}
 
 /// TTS sends all error messages in a `AnswerError` response.
 ///
@@ -317,7 +317,7 @@ pub struct AnswerError {
     pub error_message_prefix: String,
 }
 
-impl HasId for AnswerError {
+impl JsonMessage for AnswerError {
     const MESSAGE_ID: u8 = 3;
 }
 
@@ -327,7 +327,7 @@ impl fmt::Display for AnswerError {
     }
 }
 
-impl Answer for AnswerError {}
+impl IncomingMessage for AnswerError {}
 
 /// Custom Messages are sent by calling `sendExternalMessage` with the table of data you wish to send.
 ///
@@ -346,7 +346,7 @@ pub struct AnswerCustomMessage {
     pub custom_message: Value,
 }
 
-impl HasId for AnswerCustomMessage {
+impl JsonMessage for AnswerCustomMessage {
     const MESSAGE_ID: u8 = 4;
 }
 
@@ -356,7 +356,7 @@ impl fmt::Display for AnswerCustomMessage {
     }
 }
 
-impl Answer for AnswerCustomMessage {}
+impl IncomingMessage for AnswerCustomMessage {}
 
 /// If code executed with a `MessageExecute` message returns a value,
 /// it will be sent back in a `AnswerReturn` message.
@@ -380,7 +380,7 @@ pub struct AnswerReturn {
     pub return_value: Option<String>,
 }
 
-impl HasId for AnswerReturn {
+impl JsonMessage for AnswerReturn {
     const MESSAGE_ID: u8 = 5;
 }
 
@@ -390,7 +390,7 @@ impl fmt::Display for AnswerReturn {
     }
 }
 
-impl Answer for AnswerReturn {}
+impl IncomingMessage for AnswerReturn {}
 
 impl AnswerReturn {
     pub fn get_return_value(&self) -> Result<Value> {
@@ -409,7 +409,7 @@ pub struct AnswerGameSaved {
     message_id: u8,
 }
 
-impl HasId for AnswerGameSaved {
+impl JsonMessage for AnswerGameSaved {
     const MESSAGE_ID: u8 = 6;
 }
 
@@ -419,7 +419,7 @@ impl fmt::Display for AnswerGameSaved {
     }
 }
 
-impl Answer for AnswerGameSaved {}
+impl IncomingMessage for AnswerGameSaved {}
 
 /// Whenever the player saves the game in TTS, `AnswerObjectCreated` is sent as a response.
 ///
@@ -438,7 +438,7 @@ pub struct AnswerObjectCreated {
     pub guid: String,
 }
 
-impl HasId for AnswerObjectCreated {
+impl JsonMessage for AnswerObjectCreated {
     const MESSAGE_ID: u8 = 7;
 }
 
@@ -448,7 +448,7 @@ impl fmt::Display for AnswerObjectCreated {
     }
 }
 
-impl Answer for AnswerObjectCreated {}
+impl IncomingMessage for AnswerObjectCreated {}
 
 /////////////////////////////////////////////////////////////////////////////
 
@@ -479,8 +479,8 @@ pub fn message_execute(script: String) -> Result<AnswerReturn> {
     AnswerReturn::read()
 }
 
-pub fn answer_any() -> Result<Box<dyn Answer>> {
-    read_any()
+pub fn answer_any() -> Result<Box<dyn IncomingMessage>> {
+    read()
 }
 
 /////////////////////////////////////////////////////////////////////////////
