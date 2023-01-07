@@ -7,58 +7,41 @@
 pub use crate::tcp::ExternalEditorApi;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::any::Any;
-use std::fmt::{self, Display};
-
-pub trait MessageId {
-    const MESSAGE_ID: u8;
-}
-
-pub trait JsonMessage: Display {
-    fn message_id(&self) -> u8;
-    fn as_any(&self) -> &dyn Any;
-}
 
 /////////////////////////////////////////////////////////////////////////////
 
+#[derive(Serialize, Debug)]
+#[serde(tag = "messageID")]
+pub enum Message {
+    #[serde(rename = "0")]
+    MessageGetScripts(MessageGetScripts),
+    #[serde(rename = "1")]
+    MessageReload(MessageReload),
+    #[serde(rename = "2")]
+    MessageCustomMessage(MessageCustomMessage),
+    #[serde(rename = "3")]
+    MessageExectute(MessageExectute),
+}
+
+pub struct TryFromMessageError(Message);
+
 /// Get a list containing the states for every object. Returns an `AnswerReload` message.
-#[derive(Serialize, Debug, PartialEq)]
-pub struct MessageGetScripts {
-    #[serde(rename = "messageID")]
-    message_id: u8,
-}
+#[derive(Serialize, Debug)]
+pub struct MessageGetScripts {}
 
-impl MessageId for MessageGetScripts {
-    const MESSAGE_ID: u8 = 0;
-}
-
-impl JsonMessage for MessageGetScripts {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for MessageGetScripts {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Get Scripts")
+impl TryFrom<Message> for MessageGetScripts {
+    type Error = TryFromMessageError;
+    fn try_from(message: Message) -> Result<Self, Self::Error> {
+        match message {
+            Message::MessageGetScripts(message) => Ok(message),
+            other => Err(TryFromMessageError(other)),
+        }
     }
 }
 
 impl MessageGetScripts {
     pub fn new() -> Self {
-        Self {
-            message_id: Self::MESSAGE_ID,
-        }
-    }
-}
-
-impl Default for MessageGetScripts {
-    fn default() -> Self {
-        MessageGetScripts::new()
+        Self {}
     }
 }
 
@@ -69,40 +52,25 @@ impl Default for MessageGetScripts {
 /// Any objects mentioned have both their Lua script and their UI XML updated.
 /// If no value is set for either the "script" or "ui" key then the
 /// corresponding Lua script or UI XML is deleted.
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug)]
 pub struct MessageReload {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "scriptStates")]
     pub script_states: Value,
 }
 
-impl MessageId for MessageReload {
-    const MESSAGE_ID: u8 = 1;
-}
-
-impl JsonMessage for MessageReload {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for MessageReload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Reload")
+impl TryFrom<Message> for MessageReload {
+    type Error = TryFromMessageError;
+    fn try_from(message: Message) -> Result<Self, Self::Error> {
+        match message {
+            Message::MessageReload(message) => Ok(message),
+            other => Err(TryFromMessageError(other)),
+        }
     }
 }
 
 impl MessageReload {
     pub fn new(script_states: Value) -> Self {
-        Self {
-            message_id: Self::MESSAGE_ID,
-            script_states,
-        }
+        Self { script_states }
     }
 }
 
@@ -110,49 +78,32 @@ impl MessageReload {
 /// in the currently loaded game. The value of customMessage must be a table,
 /// and is passed as a parameter to the event handler.
 /// If this value is not a table then the event is not triggered.
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug)]
 pub struct MessageCustomMessage {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "customMessage")]
     pub custom_message: Value,
 }
 
-impl MessageId for MessageCustomMessage {
-    const MESSAGE_ID: u8 = 2;
-}
-
-impl JsonMessage for MessageCustomMessage {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for MessageCustomMessage {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Custom Message")
+impl TryFrom<Message> for MessageCustomMessage {
+    type Error = TryFromMessageError;
+    fn try_from(message: Message) -> Result<Self, Self::Error> {
+        match message {
+            Message::MessageCustomMessage(message) => Ok(message),
+            other => Err(TryFromMessageError(other)),
+        }
     }
 }
 
 impl MessageCustomMessage {
     pub fn new(custom_message: Value) -> Self {
-        Self {
-            message_id: Self::MESSAGE_ID,
-            custom_message,
-        }
+        Self { custom_message }
     }
 }
 
 /// Executes a lua script and returns the value in a `AnswerReturn` message.
 /// Using a guid of "-1" runs the script globally.
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug)]
 pub struct MessageExectute {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "returnID")]
     pub return_id: u8,
     #[serde(rename = "guid")]
@@ -161,30 +112,19 @@ pub struct MessageExectute {
     pub script: String,
 }
 
-impl MessageId for MessageExectute {
-    const MESSAGE_ID: u8 = 3;
-}
-
-impl JsonMessage for MessageExectute {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for MessageExectute {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Execute")
+impl TryFrom<Message> for MessageExectute {
+    type Error = TryFromMessageError;
+    fn try_from(message: Message) -> Result<Self, Self::Error> {
+        match message {
+            Message::MessageExectute(message) => Ok(message),
+            other => Err(TryFromMessageError(other)),
+        }
     }
 }
 
 impl MessageExectute {
     pub fn new(script: String) -> Self {
         Self {
-            message_id: Self::MESSAGE_ID,
             return_id: 5,
             guid: String::from("-1"),
             script,
@@ -193,6 +133,29 @@ impl MessageExectute {
 }
 
 /////////////////////////////////////////////////////////////////////////////
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "messageID")]
+pub enum Answer {
+    #[serde(rename = "0")]
+    AnswerNewObject(AnswerNewObject),
+    #[serde(rename = "1")]
+    AnswerReload(AnswerReload),
+    #[serde(rename = "2")]
+    AnswerPrint(AnswerPrint),
+    #[serde(rename = "3")]
+    AnswerError(AnswerError),
+    #[serde(rename = "4")]
+    AnswerCustomMessage(AnswerCustomMessage),
+    #[serde(rename = "5")]
+    AnswerReturn(AnswerReturn),
+    #[serde(rename = "6")]
+    AnswerGameSaved(AnswerGameSaved),
+    #[serde(rename = "7")]
+    AnswerObjectCreated(AnswerObjectCreated),
+}
+
+pub struct TryFromAnswerError(Answer);
 
 /// When clicking on "Scripting Editor" in the right click contextual menu
 /// in TTS for an object that doesn't have a Lua Script yet, TTS will send
@@ -211,31 +174,19 @@ impl MessageExectute {
 ///     ]
 /// }
 /// ```
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct AnswerNewObject {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "scriptStates")]
     pub script_states: Value,
 }
 
-impl MessageId for AnswerNewObject {
-    const MESSAGE_ID: u8 = 0;
-}
-
-impl JsonMessage for AnswerNewObject {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for AnswerNewObject {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "New Object")
+impl TryFrom<Answer> for AnswerNewObject {
+    type Error = TryFromAnswerError;
+    fn try_from(answer: Answer) -> Result<Self, Self::Error> {
+        match answer {
+            Answer::AnswerNewObject(message) => Ok(message),
+            other => Err(TryFromAnswerError(other)),
+        }
     }
 }
 
@@ -263,33 +214,21 @@ impl fmt::Display for AnswerNewObject {
 ///     ]
 /// }
 /// ```
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct AnswerReload {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "savePath")]
     pub save_path: String,
     #[serde(rename = "scriptStates")]
     pub script_states: Value,
 }
 
-impl MessageId for AnswerReload {
-    const MESSAGE_ID: u8 = 1;
-}
-
-impl JsonMessage for AnswerReload {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for AnswerReload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Reload")
+impl TryFrom<Answer> for AnswerReload {
+    type Error = TryFromAnswerError;
+    fn try_from(answer: Answer) -> Result<Self, Self::Error> {
+        match answer {
+            Answer::AnswerReload(message) => Ok(message),
+            other => Err(TryFromAnswerError(other)),
+        }
     }
 }
 
@@ -308,31 +247,19 @@ impl AnswerReload {
 ///     "message": "Hit player! White"
 /// }
 /// ```
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct AnswerPrint {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "message")]
     pub message: String,
 }
 
-impl MessageId for AnswerPrint {
-    const MESSAGE_ID: u8 = 2;
-}
-
-impl JsonMessage for AnswerPrint {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for AnswerPrint {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Print")
+impl TryFrom<Answer> for AnswerPrint {
+    type Error = TryFromAnswerError;
+    fn try_from(answer: Answer) -> Result<Self, Self::Error> {
+        match answer {
+            Answer::AnswerPrint(message) => Ok(message),
+            other => Err(TryFromAnswerError(other)),
+        }
     }
 }
 
@@ -347,10 +274,8 @@ impl fmt::Display for AnswerPrint {
 ///     "errorMessagePrefix": "Error in Global Script: "
 /// }
 /// ```
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct AnswerError {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "error")]
     pub error: String,
     #[serde(rename = "guid")]
@@ -359,23 +284,13 @@ pub struct AnswerError {
     pub error_message_prefix: String,
 }
 
-impl MessageId for AnswerError {
-    const MESSAGE_ID: u8 = 3;
-}
-
-impl JsonMessage for AnswerError {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for AnswerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Error")
+impl TryFrom<Answer> for AnswerError {
+    type Error = TryFromAnswerError;
+    fn try_from(answer: Answer) -> Result<Self, Self::Error> {
+        match answer {
+            Answer::AnswerError(message) => Ok(message),
+            other => Err(TryFromAnswerError(other)),
+        }
     }
 }
 
@@ -388,31 +303,19 @@ impl fmt::Display for AnswerError {
 ///     "custom_message": { "foo": "Hello", "bar": "World"}
 /// }
 /// ```
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct AnswerCustomMessage {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "customMessage")]
     pub custom_message: Value,
 }
 
-impl MessageId for AnswerCustomMessage {
-    const MESSAGE_ID: u8 = 4;
-}
-
-impl JsonMessage for AnswerCustomMessage {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for AnswerCustomMessage {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Custom Message")
+impl TryFrom<Answer> for AnswerCustomMessage {
+    type Error = TryFromAnswerError;
+    fn try_from(answer: Answer) -> Result<Self, Self::Error> {
+        match answer {
+            Answer::AnswerCustomMessage(message) => Ok(message),
+            other => Err(TryFromAnswerError(other)),
+        }
     }
 }
 
@@ -428,33 +331,21 @@ impl fmt::Display for AnswerCustomMessage {
 ///     "return_value": true
 /// }
 /// ```
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct AnswerReturn {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "returnID")]
     pub return_id: u8,
     #[serde(rename = "returnValue")]
     pub return_value: Option<String>,
 }
 
-impl MessageId for AnswerReturn {
-    const MESSAGE_ID: u8 = 5;
-}
-
-impl JsonMessage for AnswerReturn {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for AnswerReturn {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Return")
+impl TryFrom<Answer> for AnswerReturn {
+    type Error = TryFromAnswerError;
+    fn try_from(answer: Answer) -> Result<Self, Self::Error> {
+        match answer {
+            Answer::AnswerReturn(message) => Ok(message),
+            other => Err(TryFromAnswerError(other)),
+        }
     }
 }
 
@@ -466,29 +357,16 @@ impl AnswerReturn {
 }
 
 /// Whenever the player saves the game in TTS, `AnswerGameSaved` is sent as a response.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
-pub struct AnswerGameSaved {
-    #[serde(rename = "messageID")]
-    message_id: u8,
-}
+#[derive(Deserialize, Debug)]
+pub struct AnswerGameSaved {}
 
-impl MessageId for AnswerGameSaved {
-    const MESSAGE_ID: u8 = 6;
-}
-
-impl JsonMessage for AnswerGameSaved {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl fmt::Display for AnswerGameSaved {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Game Saved")
+impl TryFrom<Answer> for AnswerGameSaved {
+    type Error = TryFromAnswerError;
+    fn try_from(answer: Answer) -> Result<Self, Self::Error> {
+        match answer {
+            Answer::AnswerGameSaved(message) => Ok(message),
+            other => Err(TryFromAnswerError(other)),
+        }
     }
 }
 
@@ -501,31 +379,44 @@ impl fmt::Display for AnswerGameSaved {
 ///     "guid": "abcdef"
 /// }
 /// ```
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug)]
 pub struct AnswerObjectCreated {
-    #[serde(rename = "messageID")]
-    message_id: u8,
     #[serde(rename = "guid")]
     pub guid: String,
 }
 
-impl MessageId for AnswerObjectCreated {
-    const MESSAGE_ID: u8 = 7;
-}
-
-impl JsonMessage for AnswerObjectCreated {
-    fn message_id(&self) -> u8 {
-        self.message_id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
+impl TryFrom<Answer> for AnswerObjectCreated {
+    type Error = TryFromAnswerError;
+    fn try_from(answer: Answer) -> Result<Self, Self::Error> {
+        match answer {
+            Answer::AnswerObjectCreated(message) => Ok(message),
+            other => Err(TryFromAnswerError(other)),
+        }
     }
 }
 
-impl fmt::Display for AnswerObjectCreated {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Object Created")
+/////////////////////////////////////////////////////////////////////////////
+
+impl ExternalEditorApi {
+    pub fn get_scripts(&self) -> AnswerReload {
+        self.send(Message::MessageGetScripts(MessageGetScripts::new()));
+        self.wait()
+    }
+
+    pub fn reload(&self, script_states: Value) -> AnswerReload {
+        self.send(Message::MessageReload(MessageReload::new(script_states)));
+        self.wait()
+    }
+
+    pub fn custom_message(&self, message: Value) {
+        self.send(Message::MessageCustomMessage(MessageCustomMessage::new(
+            message,
+        )));
+    }
+
+    pub fn execute(&self, script: String) -> AnswerReturn {
+        self.send(Message::MessageExectute(MessageExectute::new(script)));
+        self.wait()
     }
 }
 
@@ -556,8 +447,8 @@ mod tests {
     fn test_read() {
         let api = ExternalEditorApi::new();
         loop {
-            let answer = api.read().unwrap();
-            println!("{}", answer);
+            let answer = api.read();
+            println!("{:#?}", answer);
         }
     }
 }
