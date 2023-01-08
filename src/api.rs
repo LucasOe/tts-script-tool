@@ -5,22 +5,61 @@
 //! All communication messages are JSON.
 
 pub use crate::tcp::ExternalEditorApi;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Serialize, Serializer, __private::ser::FlatMapSerializer, ser::SerializeMap,
+};
 use serde_json::Value;
 
 /////////////////////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Debug)]
-#[serde(tag = "messageID")]
+#[derive(Debug)]
 pub enum Message {
-    #[serde(rename = "0")]
     MessageGetScripts(MessageGetScripts),
-    #[serde(rename = "1")]
     MessageReload(MessageReload),
-    #[serde(rename = "2")]
     MessageCustomMessage(MessageCustomMessage),
-    #[serde(rename = "3")]
     MessageExectute(MessageExectute),
+}
+
+// Workaround for: https://github.com/serde-rs/serde/issues/745
+// https://stackoverflow.com/questions/65575385/deserialization-of-json-with-serde-by-a-numerical-value-as-type-identifier/65576570#65576570
+//
+// #[derive(Serialize, Debug)]
+// #[serde(tag = "messageID")]
+// pub enum Message {
+//     #[serde(rename = 0)]
+//     MessageGetScripts(MessageGetScripts),
+//     #[serde(rename = 1)]
+//     MessageReload(MessageReload),
+//     #[serde(rename = 2)]
+//     MessageCustomMessage(MessageCustomMessage),
+//     #[serde(rename = 3)]
+//     MessageExectute(MessageExectute),
+// }
+//
+impl Serialize for Message {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_map(None)?;
+
+        let id_ = &match self {
+            Message::MessageGetScripts(_) => 0,
+            Message::MessageReload(_) => 1,
+            Message::MessageCustomMessage(_) => 2,
+            Message::MessageExectute(_) => 3,
+        };
+        s.serialize_entry("messageID", &id_)?;
+
+        match self {
+            Message::MessageGetScripts(t) => t.serialize(FlatMapSerializer(&mut s))?,
+            Message::MessageReload(t) => t.serialize(FlatMapSerializer(&mut s))?,
+            Message::MessageCustomMessage(t) => t.serialize(FlatMapSerializer(&mut s))?,
+            Message::MessageExectute(t) => t.serialize(FlatMapSerializer(&mut s))?,
+        }
+
+        s.end()
+    }
 }
 
 pub struct TryFromMessageError(Message);
@@ -134,25 +173,60 @@ impl MessageExectute {
 
 /////////////////////////////////////////////////////////////////////////////
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "messageID")]
+#[derive(Debug)]
 pub enum Answer {
-    #[serde(rename = "0")]
     AnswerNewObject(AnswerNewObject),
-    #[serde(rename = "1")]
     AnswerReload(AnswerReload),
-    #[serde(rename = "2")]
     AnswerPrint(AnswerPrint),
-    #[serde(rename = "3")]
     AnswerError(AnswerError),
-    #[serde(rename = "4")]
     AnswerCustomMessage(AnswerCustomMessage),
-    #[serde(rename = "5")]
     AnswerReturn(AnswerReturn),
-    #[serde(rename = "6")]
     AnswerGameSaved(AnswerGameSaved),
-    #[serde(rename = "7")]
     AnswerObjectCreated(AnswerObjectCreated),
+}
+
+// Workaround for: https://github.com/serde-rs/serde/issues/745
+// https://stackoverflow.com/questions/65575385/deserialization-of-json-with-serde-by-a-numerical-value-as-type-identifier/65576570#65576570
+//
+// #[derive(Deserialize, Debug)]
+// #[serde(tag = "messageID")]
+// pub enum Answer {
+//     #[serde(rename = 0)]
+//     AnswerNewObject(AnswerNewObject),
+//     #[serde(rename = 1)]
+//     AnswerReload(AnswerReload),
+//     #[serde(rename = 2)]
+//     AnswerPrint(AnswerPrint),
+//     #[serde(rename = 3)]
+//     AnswerError(AnswerError),
+//     #[serde(rename = 4)]
+//     AnswerCustomMessage(AnswerCustomMessage),
+//     #[serde(rename = 5)]
+//     AnswerReturn(AnswerReturn),
+//     #[serde(rename = 6)]
+//     AnswerGameSaved(AnswerGameSaved),
+//     #[serde(rename = 7)]
+//     AnswerObjectCreated(AnswerObjectCreated),
+// }
+//
+impl<'de> serde::Deserialize<'de> for Answer {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let value = Value::deserialize(d)?;
+
+        Ok(
+            match value.get("messageID").and_then(Value::as_u64).unwrap() {
+                0 => Answer::AnswerNewObject(AnswerNewObject::deserialize(value).unwrap()),
+                1 => Answer::AnswerReload(AnswerReload::deserialize(value).unwrap()),
+                2 => Answer::AnswerPrint(AnswerPrint::deserialize(value).unwrap()),
+                3 => Answer::AnswerError(AnswerError::deserialize(value).unwrap()),
+                4 => Answer::AnswerCustomMessage(AnswerCustomMessage::deserialize(value).unwrap()),
+                5 => Answer::AnswerReturn(AnswerReturn::deserialize(value).unwrap()),
+                6 => Answer::AnswerGameSaved(AnswerGameSaved::deserialize(value).unwrap()),
+                7 => Answer::AnswerObjectCreated(AnswerObjectCreated::deserialize(value).unwrap()),
+                id_ => panic!("unsupported id {:?}", id_),
+            },
+        )
+    }
 }
 
 pub struct TryFromAnswerError(Answer);
