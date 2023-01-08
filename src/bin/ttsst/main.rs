@@ -1,8 +1,11 @@
+mod app;
+
 use anyhow::Result;
+use app::{attach, backup, reload};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
 use std::path::PathBuf;
-use ttsst::{attach, backup, reload, ExternalEditorApi};
+use ttsst::ExternalEditorApi;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
