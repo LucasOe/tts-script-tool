@@ -5,7 +5,7 @@ use app::{attach, backup, reload};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
 use std::path::PathBuf;
-use ttsst::ExternalEditorApi;
+use tts_external_api::ExternalEditorApi;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -50,11 +50,11 @@ fn main() {
 }
 
 fn run(args: Args) -> Result<()> {
-    let mut api = ExternalEditorApi::new();
+    let api = ExternalEditorApi::new();
     match args.command {
-        Commands::Attach { path, guid } => attach(&mut api, &path, guid)?,
-        Commands::Backup { path } => backup(&mut api, &path)?,
-        Commands::Reload { path } => reload(&mut api, &path)?,
+        Commands::Attach { path, guid } => attach(&api, &path, guid)?,
+        Commands::Backup { path } => backup(&api, &path)?,
+        Commands::Reload { path } => reload(&api, &path)?,
     }
     Ok(())
 }

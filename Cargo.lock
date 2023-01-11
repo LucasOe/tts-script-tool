@@ -512,6 +512,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tts-external-api"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd8857357e207d6eef934396c17ed15e0b896fd04bcbcd98e4c6e18b1538ff8c"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "ttsst"
 version = "0.1.0"
 dependencies = [
@@ -523,6 +534,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snailquote",
+ "tts-external-api",
 ]
 
 [[package]]

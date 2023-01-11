@@ -16,3 +16,4 @@ regex = "1.6.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 snailquote = "0.3.1"
+tts-external-api = "0.1.1"
