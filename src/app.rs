@@ -2,11 +2,10 @@ use anyhow::{bail, Result};
 use colorize::AnsiColor;
 use inquire::Select;
 use regex::Regex;
-use serde_json::{json, Value};
 use snailquote::unescape;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tts_external_api::ExternalEditorApi;
+use tts_external_api::{json, ExternalEditorApi, Value};
 
 struct Tags {
     valid: Vec<Value>,

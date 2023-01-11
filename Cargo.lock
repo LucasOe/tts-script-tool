@@ -531,8 +531,6 @@ dependencies = [
  "colorize",
  "inquire",
  "regex",
- "serde",
- "serde_json",
  "snailquote",
  "tts-external-api",
 ]
