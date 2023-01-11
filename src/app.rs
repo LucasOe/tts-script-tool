@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use snailquote::unescape;
 use std::fs;
 use std::path::{Path, PathBuf};
-use ttsst::ExternalEditorApi;
+use tts_external_api::ExternalEditorApi;
 
 struct Tags {
     valid: Vec<Value>,
@@ -15,7 +15,7 @@ struct Tags {
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
-pub fn attach(api: &mut ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> Result<()> {
+pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> Result<()> {
     let path = Path::new(path);
     if path.exists() && path.is_file() {
         let file_name = path.file_name().unwrap().to_str().unwrap();
@@ -30,7 +30,7 @@ pub fn attach(api: &mut ExternalEditorApi, path: &PathBuf, guid: Option<String>)
         );
         let file_content = fs::read_to_string(path)?;
         set_script(api, &guid, &file_content, &tag)?;
-        api.reload(json!([]));
+        api.reload(json!([]))?;
         println!("{}", "reloaded save!".green().bold());
         set_tag(api, file_name, &guid)?;
         println!("To save the appied tag it is recommended to save the game before reloading.");
@@ -41,7 +41,7 @@ pub fn attach(api: &mut ExternalEditorApi, path: &PathBuf, guid: Option<String>)
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
+pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
     // map tags to guids
     let script = format!(
         r#"
@@ -55,7 +55,7 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
         "#,
     );
 
-    let guid_tags = api.execute(script).return_value().expect("No return value");
+    let guid_tags = api.execute(script)?.return_value;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     if let Value::Object(guid_tags) = guid_tags {
@@ -79,7 +79,7 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
     }
 
     // get scriptStates
-    let save_data = api.get_scripts().script_states();
+    let save_data = api.get_scripts()?.script_states;
     let script_states = save_data.as_array().unwrap();
 
     // add global script to script_list
@@ -98,17 +98,17 @@ pub fn reload(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
         "script": global_script,
         "ui": global_ui
     }]);
-    api.reload(message);
+    api.reload(message)?;
     println!("{}", "reloaded save!".green().bold());
 
     Ok(())
 }
 
 /// Backup current save as file
-pub fn backup(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
+pub fn backup(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
     let mut path = PathBuf::from(path);
     path.set_extension("json");
-    let save_path = api.get_scripts().save_path;
+    let save_path = api.get_scripts()?.save_path;
     fs::copy(&save_path, &path)?;
     println!(
         "{} \"{save_name}\" as \"{path}\"",
@@ -120,7 +120,7 @@ pub fn backup(api: &mut ExternalEditorApi, path: &PathBuf) -> Result<()> {
 }
 
 /// Shows the user a list of all objects in the save to select from.
-fn select_object(api: &mut ExternalEditorApi) -> Result<String> {
+fn select_object(api: &ExternalEditorApi) -> Result<String> {
     let objects = get_objects(api)?;
     let selection = Select::new("Select the object to attach the script to:", objects).prompt();
     match selection {
@@ -131,7 +131,7 @@ fn select_object(api: &mut ExternalEditorApi) -> Result<String> {
 
 /// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
-fn set_tag(api: &mut ExternalEditorApi, file_name: &str, guid: &str) -> Result<String> {
+fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<String> {
     // check if guid exists
     let objects = get_objects(api)?;
     if !objects.contains(&json!(&guid)) {
@@ -145,7 +145,7 @@ fn set_tag(api: &mut ExternalEditorApi, file_name: &str, guid: &str) -> Result<S
         "#,
     );
 
-    let tags = api.execute(script).return_value().expect("No return value");
+    let tags = api.execute(script)?.return_value;
 
     // set new tags for object
     if let Value::Array(tags) = tags {
@@ -158,7 +158,7 @@ fn set_tag(api: &mut ExternalEditorApi, file_name: &str, guid: &str) -> Result<S
             "#,
             tags = json!(tags).to_string().escape_default(),
         );
-        api.execute(script);
+        api.execute(script)?;
 
         Ok(tag)
     } else {
@@ -167,7 +167,7 @@ fn set_tag(api: &mut ExternalEditorApi, file_name: &str, guid: &str) -> Result<S
 }
 
 /// Sets the script for the object.
-fn set_script(api: &mut ExternalEditorApi, guid: &str, script: &str, tag: &str) -> Result<()> {
+fn set_script(api: &ExternalEditorApi, guid: &str, script: &str, tag: &str) -> Result<()> {
     // check if guid exists
     let objects = get_objects(api)?;
     if !objects.contains(&json!(&guid)) {
@@ -180,14 +180,14 @@ fn set_script(api: &mut ExternalEditorApi, guid: &str, script: &str, tag: &str) 
         "#,
         script.escape_default()
     );
-    api.execute(script);
+    api.execute(script)?;
 
     println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
     Ok(())
 }
 
 /// Returns a list of all guids
-pub fn get_objects(api: &mut ExternalEditorApi) -> Result<Vec<Value>> {
+pub fn get_objects(api: &ExternalEditorApi) -> Result<Vec<Value>> {
     let script = format!(
         r#"
             list = {{}}
@@ -197,7 +197,7 @@ pub fn get_objects(api: &mut ExternalEditorApi) -> Result<Vec<Value>> {
             return JSON.encode(list)
         "#,
     );
-    let objects = api.execute(script).return_value().expect("No return value");
+    let objects = api.execute(script)?.return_value;
     Ok(objects.as_array().unwrap().to_owned())
 }
 
