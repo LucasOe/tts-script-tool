@@ -1,9 +1,10 @@
 mod app;
+mod error;
 
-use anyhow::Result;
 use app::{attach, backup, reload};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
+use error::Result;
 use std::path::PathBuf;
 use tts_external_api::ExternalEditorApi;
 

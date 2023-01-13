@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use crate::error::{Error, Result};
 use colorize::AnsiColor;
 use inquire::Select;
 use regex::Regex;
@@ -11,26 +11,23 @@ use tts_external_api::{json, ExternalEditorApi, Value};
 /// and then reloads the save, the same way it does when pressing "Save & Play".
 pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> Result<()> {
     let path = Path::new(path);
-    if path.exists() && path.is_file() {
-        let file_name = path.file_name().unwrap().to_str().unwrap();
-        let guid = match guid {
-            Some(guid) => guid,
-            None => select_object(api)?,
-        };
-        let tag = set_tag(api, file_name, &guid)?;
-        println!(
-            "{} \"{tag}\" as a tag for \"{guid}\"",
-            "added:".yellow().bold()
-        );
-        let file_content = fs::read_to_string(path)?;
-        set_script(api, &guid, &file_content, &tag)?;
-        api.reload(json!([]))?;
-        println!("{}", "reloaded save!".green().bold());
-        set_tag(api, file_name, &guid)?;
-        println!("To save the appied tag it is recommended to save the game before reloading.");
-    } else {
-        bail!("{:?} is not a file", path)
-    }
+    let file_name = path.file_name().unwrap().to_str().unwrap();
+    let guid = match guid {
+        Some(guid) => guid,
+        None => select_object(api)?,
+    };
+    guid_exists(api, &guid)?;
+    let tag = set_tag(api, file_name, &guid)?;
+    println!(
+        "{} \"{tag}\" as a tag for \"{guid}\"",
+        "added:".yellow().bold()
+    );
+    let file_content = fs::read_to_string(path)?;
+    set_script(api, &guid, &file_content, &tag)?;
+    api.reload(json!([]))?;
+    println!("{}", "reloaded save!".green().bold());
+    set_tag(api, file_name, &guid)?;
+    println!("To save the appied tag it is recommended to save the game before reloading.");
     Ok(())
 }
 
@@ -60,11 +57,11 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
                 let valid_tag: Option<String> = match tags.len() {
                     1 => Some(unescape_value(&tags[0])),
                     0 => None,
-                    _ => bail!("{} has multiple script tags", guid),
+                    _ => return Err(Error::ValidTags { guid, tags }),
                 };
 
                 if let Some(tag) = valid_tag {
-                    let file_path = get_file_from_tag(path, &tag, &guid)?;
+                    let file_path = get_file_from_tag(path, &tag);
                     let file_content = fs::read_to_string(file_path)?;
                     set_script(api, &guid, &file_content, &tag)?;
                 }
@@ -116,21 +113,13 @@ pub fn backup(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
 /// Shows the user a list of all objects in the save to select from.
 fn select_object(api: &ExternalEditorApi) -> Result<String> {
     let objects = get_objects(api)?;
-    let selection = Select::new("Select the object to attach the script to:", objects).prompt();
-    match selection {
-        Ok(selection) => Ok(unescape_value(&selection)),
-        Err(_) => bail!("could not select an object to apply the script to"),
-    }
+    let selection = Select::new("Select the object to attach the script to:", objects).prompt()?;
+    Ok(unescape_value(&selection))
 }
 
 /// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
 // Guid has to be global so objects without scripts can execute code.
 fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<String> {
-    // check if guid exists
-    let objects = get_objects(api)?;
-    if !objects.contains(&json!(&guid)) {
-        bail!("\"{guid}\" does not exist")
-    }
     // get existing tags for object
     let tag = format!("scripts/{file_name}");
     let script = format!(
@@ -139,34 +128,26 @@ fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<Strin
         "#,
     );
 
-    let tags = api.execute(script)?.return_value;
+    let return_value = api.execute(script)?.return_value;
+    let tags = return_value.as_array().unwrap();
 
     // set new tags for object
-    if let Value::Array(tags) = tags {
-        let (_, mut tags) = get_valid_tags(tags);
-        tags.push(Value::String(String::from(&tag)));
-        let script = format!(
-            r#"
-                tags = JSON.decode("{tags}")
-                getObjectFromGUID("{guid}").setTags(tags)
-            "#,
-            tags = json!(tags).to_string().escape_default(),
-        );
-        api.execute(script)?;
+    let (_, mut tags) = get_valid_tags(tags.clone());
+    tags.push(Value::String(String::from(&tag)));
+    let script = format!(
+        r#"
+            tags = JSON.decode("{tags}")
+            getObjectFromGUID("{guid}").setTags(tags)
+        "#,
+        tags = json!(tags).to_string().escape_default(),
+    );
+    api.execute(script)?;
 
-        Ok(tag)
-    } else {
-        bail!("could not set tag for \"{guid}\"")
-    }
+    Ok(tag)
 }
 
 /// Sets the script for the object.
 fn set_script(api: &ExternalEditorApi, guid: &str, script: &str, tag: &str) -> Result<()> {
-    // check if guid exists
-    let objects = get_objects(api)?;
-    if !objects.contains(&json!(&guid)) {
-        bail!("\"{guid}\" does not exist")
-    }
     // add lua script for object
     let script = format!(
         r#"
@@ -207,19 +188,20 @@ fn get_valid_tags(tags: Vec<Value>) -> (Vec<Value>, Vec<Value>) {
 }
 
 /// Gets the corresponding from the path according to the tag. Path has to be a directory.
-fn get_file_from_tag(path: &PathBuf, tag: &str, guid: &str) -> Result<String> {
+fn get_file_from_tag(path: &PathBuf, tag: &str) -> String {
     let path = Path::new(path);
     let file_name = Path::new(&tag).file_name().unwrap();
-    if path.exists() && path.is_dir() {
-        let file_path = path.join(file_name);
-        if file_path.exists() && file_path.is_file() {
-            Ok(String::from(file_path.to_string_lossy()))
-        } else {
-            bail!("file for {:?} with tag {} not found", guid, tag)
-        }
-    } else {
-        bail!("{:?} is not a directory", path)
+    let file_path = path.join(file_name);
+    String::from(file_path.to_string_lossy())
+}
+
+/// Returns an Error if the guid doesn't exist in the current save
+fn guid_exists(api: &ExternalEditorApi, guid: &String) -> Result<()> {
+    let objects = get_objects(api)?;
+    if !objects.contains(&json!(guid)) {
+        return Err(Error::MissingGuid(guid.to_owned()));
     }
+    Ok(())
 }
 
 /// Unescapes a Value and returns it as a String.
