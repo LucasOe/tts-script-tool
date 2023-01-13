@@ -7,11 +7,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tts_external_api::{json, ExternalEditorApi, Value};
 
-struct Tags {
-    valid: Vec<Value>,
-    invalid: Vec<Value>,
-}
-
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
 pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> Result<()> {
@@ -60,10 +55,10 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
     if let Value::Object(guid_tags) = guid_tags {
         for (guid, tags) in guid_tags {
             if let Value::Array(tags) = tags {
-                let valid_tags = get_valid_tags(tags).valid;
+                let (tags, _) = get_valid_tags(tags);
                 // ensure that the object only has one valid tag
-                let valid_tag: Option<String> = match valid_tags.len() {
-                    1 => Some(unescape_value(&valid_tags[0])),
+                let valid_tag: Option<String> = match tags.len() {
+                    1 => Some(unescape_value(&tags[0])),
                     0 => None,
                     _ => bail!("{} has multiple script tags", guid),
                 };
@@ -148,7 +143,7 @@ fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<Strin
 
     // set new tags for object
     if let Value::Array(tags) = tags {
-        let mut tags = get_valid_tags(tags).invalid;
+        let (_, mut tags) = get_valid_tags(tags);
         tags.push(Value::String(String::from(&tag)));
         let script = format!(
             r#"
@@ -202,13 +197,13 @@ pub fn get_objects(api: &ExternalEditorApi) -> Result<Vec<Value>> {
 
 /// Split the tags into valid and non valid tags
 // Get the tags that follow the "scripts/<File>.ttslua" naming convention.
-fn get_valid_tags(tags: Vec<Value>) -> Tags {
+fn get_valid_tags(tags: Vec<Value>) -> (Vec<Value>, Vec<Value>) {
     let exprs = Regex::new(r"^(scripts/)[\d\w]+(\.lua|.ttslua)$").unwrap();
     let (valid, invalid): (Vec<Value>, Vec<Value>) = tags
         .into_iter()
         .partition(|tag| exprs.is_match(&unescape_value(tag)));
 
-    Tags { valid, invalid }
+    (valid, invalid)
 }
 
 /// Gets the corresponding from the path according to the tag. Path has to be a directory.
