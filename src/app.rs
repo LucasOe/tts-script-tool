@@ -27,7 +27,7 @@ pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> 
     api.reload(json!([]))?;
     println!("{}", "reloaded save!".green().bold());
     set_tag(api, file_name, &guid)?;
-    println!("To save the appied tag it is recommended to save the game before reloading.");
+    println!("To save the applied tag it is recommended to save the game before reloading.");
     Ok(())
 }
 
@@ -204,7 +204,7 @@ fn guid_exists(api: &ExternalEditorApi, guid: &String) -> Result<()> {
     Ok(())
 }
 
-/// Unescapes a Value and returns it as a String.
+/// Unescape a Value and returns it as a String.
 fn unescape_value(value: &Value) -> String {
     unescape(&value.to_string()).unwrap()
 }
