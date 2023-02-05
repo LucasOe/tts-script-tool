@@ -5,7 +5,7 @@ Attach and update scripts in Tabletop Simulator via the command line.
 This tool exists as an alternative method of using scripts within Tabletop Simulator.
 It attaches scripts to objects using ingame tags. This way multiple objects can share the same script.
 This allows for a clean projects structure where the amount of scripts you have is independent from the objects ingame.
-It also allows for easy integeration of tools like [TypescriptToLua](https://typescripttolua.github.io/).
+It also allows for easy integration of tools like [TypescriptToLua](https://typescripttolua.github.io/).
 
 ## Usage
 
