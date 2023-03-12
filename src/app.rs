@@ -135,9 +135,8 @@ fn get_file_from_tag(path: &PathBuf, tag: &str) -> String {
 
 /// Returns an Error if the guid doesn't exist in the current save
 fn guid_exists(api: &ExternalEditorApi, guid: &String) -> Result<()> {
-    let objects = get_objects(api)?;
-    if !objects.contains(guid) {
-        return Err(Error::MissingGuid(guid.to_owned()));
-    }
-    Ok(())
+    get_objects(api)?
+        .contains(guid)
+        .then_some(())
+        .ok_or(Error::MissingGuid(guid.to_owned()))
 }
