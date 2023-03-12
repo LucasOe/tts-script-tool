@@ -1,10 +1,10 @@
 use crate::error::{Error, Result};
 use crate::execute;
+use crate::messages::*;
 use colorize::AnsiColor;
 use inquire::Select;
 use regex::Regex;
 use snailquote::unescape;
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tts_external_api::{json, ExternalEditorApi};
@@ -129,47 +129,6 @@ fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<Strin
     )?;
 
     Ok(tag)
-}
-
-/// Sets the script for the object.
-fn set_script(api: &ExternalEditorApi, guid: &str, script: &str) -> Result<()> {
-    execute!(
-        api,
-        r#"
-            getObjectFromGUID("{guid}").setLuaScript("{}")
-        "#,
-        script.escape_default()
-    )
-}
-
-/// Returns a list of all guids
-pub fn get_objects(api: &ExternalEditorApi) -> Result<Vec<String>> {
-    execute!(
-        api,
-        r#"
-            list = {{}}
-            for _, obj in pairs(getAllObjects()) do
-                table.insert(list, obj.guid)
-            end
-            return JSON.encode(list)
-        "#,
-    )
-}
-
-// Returns a list of tags associated with each object
-fn get_tags(api: &ExternalEditorApi) -> Result<HashMap<String, Vec<String>>> {
-    execute!(
-        api,
-        r#"
-            list = {{}}
-            for _, obj in pairs(getAllObjects()) do
-                if obj.hasAnyTag() then
-                    list[obj.guid] = obj.getTags()
-                end
-            end
-            return JSON.encode(list)
-        "#,
-    )
 }
 
 /// Split the tags into valid and non valid tags
