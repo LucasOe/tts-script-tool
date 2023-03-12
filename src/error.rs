@@ -1,5 +1,4 @@
 use thiserror::Error;
-use tts_external_api::Value;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -7,8 +6,10 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
+    #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
     #[error("{guid} has multiple valid script tags: {tags:?}")]
-    ValidTags { guid: String, tags: Vec<Value> },
+    ValidTags { guid: String, tags: Vec<String> },
     #[error("{0} does not exist")]
     MissingGuid(String),
 }
