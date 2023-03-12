@@ -25,7 +25,8 @@ pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> 
         "added:".yellow().bold()
     );
     let file_content = fs::read_to_string(path)?;
-    set_script(api, &guid, &file_content, &tag)?;
+    set_script(api, &guid, &file_content)?;
+    println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
     api.reload(json!([]))?;
     println!("{}", "reloaded save!".green().bold());
     set_tag(api, file_name, &guid)?;
@@ -35,19 +36,7 @@ pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> 
 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
-    // map tags to guids
-    let guid_tags: HashMap<String, Vec<String>> = execute!(
-        api,
-        r#"
-            list = {{}}
-            for _, obj in pairs(getAllObjects()) do
-                if obj.hasAnyTag() then
-                    list[obj.guid] = obj.getTags()
-                end
-            end
-            return JSON.encode(list)
-        "#,
-    )?;
+    let guid_tags = get_tags(&api)?;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     for (guid, tags) in guid_tags {
@@ -62,7 +51,8 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
         if let Some(tag) = valid_tag {
             let file_path = get_file_from_tag(path, &tag);
             let file_content = fs::read_to_string(file_path)?;
-            set_script(api, &guid, &file_content, &tag)?;
+            set_script(api, &guid, &file_content)?;
+            println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
         }
     }
 
@@ -142,18 +132,14 @@ fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<Strin
 }
 
 /// Sets the script for the object.
-fn set_script(api: &ExternalEditorApi, guid: &str, script: &str, tag: &str) -> Result<()> {
-    // add lua script for object
+fn set_script(api: &ExternalEditorApi, guid: &str, script: &str) -> Result<()> {
     execute!(
         api,
         r#"
             getObjectFromGUID("{guid}").setLuaScript("{}")
         "#,
         script.escape_default()
-    )?;
-
-    println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
-    Ok(())
+    )
 }
 
 /// Returns a list of all guids
@@ -164,6 +150,22 @@ pub fn get_objects(api: &ExternalEditorApi) -> Result<Vec<String>> {
             list = {{}}
             for _, obj in pairs(getAllObjects()) do
                 table.insert(list, obj.guid)
+            end
+            return JSON.encode(list)
+        "#,
+    )
+}
+
+// Returns a list of tags associated with each object
+fn get_tags(api: &ExternalEditorApi) -> Result<HashMap<String, Vec<String>>> {
+    execute!(
+        api,
+        r#"
+            list = {{}}
+            for _, obj in pairs(getAllObjects()) do
+                if obj.hasAnyTag() then
+                    list[obj.guid] = obj.getTags()
+                end
             end
             return JSON.encode(list)
         "#,
