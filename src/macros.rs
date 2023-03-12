@@ -5,3 +5,13 @@ macro_rules! execute {
         serde_json::from_value(result).map_err(crate::error::Error::SerdeError)
     }}
 }
+
+#[macro_export]
+macro_rules! print_info {
+    ($label:expr) => {
+        println!("{}", $label.green().bold());
+    };
+    ($label:expr, $($arg:tt)*) => {
+        println!("{} {}", $label.yellow().bold(), format!($($arg)*));
+    };
+}
