@@ -9,9 +9,9 @@ pub enum Error {
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
     #[error("{guid} has multiple valid script tags: {tags:?}")]
-    ValidTags { guid: String, tags: Vec<String> },
-    #[error("{0} does not exist")]
-    MissingGuid(String),
+    TooManyTags { guid: String, tags: Vec<String> },
+    #[error("{guid} does not exist")]
+    MissingGuid { guid: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -40,7 +40,7 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
         let valid_tag: Option<String> = match tags.len() {
             1 => Some(tags[0].clone()),
             0 => None,
-            _ => return Err(Error::ValidTags { guid, tags }),
+            _ => return Err(Error::TooManyTags { guid, tags }),
         };
 
         if let Some(tag) = valid_tag {
@@ -134,7 +134,7 @@ fn get_guid(api: &ExternalEditorApi, guid: Option<String>) -> Result<String> {
 fn guid_exists(api: &ExternalEditorApi, guid: String) -> Result<String> {
     match get_objects(api)?.contains(&guid) {
         true => Ok(guid),
-        false => Err(Error::MissingGuid(guid)),
+        false => Err(Error::MissingGuid { guid }),
     }
 }
 
