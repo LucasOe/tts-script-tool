@@ -1,5 +1,4 @@
 use crate::error::{Error, Result};
-use crate::execute;
 use crate::messages::*;
 use colorize::AnsiColor;
 use inquire::Select;
@@ -36,7 +35,7 @@ pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> 
 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
-    let guid_tags = get_tags(&api)?;
+    let guid_tags = get_tag_map(&api)?;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     for (guid, tags) in guid_tags {
@@ -109,24 +108,12 @@ fn select_object(api: &ExternalEditorApi) -> Result<String> {
 fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<String> {
     // get existing tags for object
     let tag = format!("scripts/{file_name}");
-    let tags: Vec<String> = execute!(
-        api,
-        r#"
-            return JSON.encode(getObjectFromGUID("{guid}").getTags())
-        "#,
-    )?;
+    let tags = get_tags(api, guid)?;
 
     // set new tags for object
-    let (_, mut tags) = get_valid_tags(tags.clone());
+    let (_, mut tags) = get_valid_tags(tags);
     tags.push(String::from(&tag));
-    execute!(
-        api,
-        r#"
-            tags = JSON.decode("{tags}")
-            getObjectFromGUID("{guid}").setTags(tags)
-        "#,
-        tags = json!(tags).to_string().escape_default(),
-    )?;
+    add_tags(api, guid, &tags)?;
 
     Ok(tag)
 }
