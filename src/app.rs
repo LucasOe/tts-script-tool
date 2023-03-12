@@ -1,6 +1,5 @@
 use crate::error::{Error, Result};
 use crate::{messages::*, print_info};
-use colorize::AnsiColor;
 use inquire::Select;
 use regex::Regex;
 use snailquote::unescape;
@@ -32,7 +31,7 @@ pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> 
 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
-    let guid_tags = get_tag_map(&api)?;
+    let guid_tags = get_tag_map(api)?;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     for (guid, tags) in guid_tags {
