@@ -1,5 +1,6 @@
 mod app;
 mod error;
+mod macros;
 
 use app::{attach, backup, reload};
 use clap::{Parser, Subcommand};

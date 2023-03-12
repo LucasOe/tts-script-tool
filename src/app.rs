@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::execute;
 use colorize::AnsiColor;
 use inquire::Select;
 use regex::Regex;
@@ -35,7 +36,8 @@ pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
     // map tags to guids
-    let script = format!(
+    let guid_tags: HashMap<String, Vec<String>> = execute!(
+        api,
         r#"
             list = {{}}
             for _, obj in pairs(getAllObjects()) do
@@ -45,10 +47,7 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
             end
             return JSON.encode(list)
         "#,
-    );
-
-    let guid_tags = api.execute(script)?.return_value;
-    let guid_tags: HashMap<String, Vec<String>> = serde_json::from_value(guid_tags)?;
+    )?;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     for (guid, tags) in guid_tags {
@@ -120,26 +119,24 @@ fn select_object(api: &ExternalEditorApi) -> Result<String> {
 fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<String> {
     // get existing tags for object
     let tag = format!("scripts/{file_name}");
-    let script = format!(
+    let tags: Vec<String> = execute!(
+        api,
         r#"
             return JSON.encode(getObjectFromGUID("{guid}").getTags())
         "#,
-    );
-
-    let return_value = api.execute(script)?.return_value;
-    let tags: Vec<String> = serde_json::from_value(return_value)?;
+    )?;
 
     // set new tags for object
     let (_, mut tags) = get_valid_tags(tags.clone());
     tags.push(String::from(&tag));
-    let script = format!(
+    execute!(
+        api,
         r#"
             tags = JSON.decode("{tags}")
             getObjectFromGUID("{guid}").setTags(tags)
         "#,
         tags = json!(tags).to_string().escape_default(),
-    );
-    api.execute(script)?;
+    )?;
 
     Ok(tag)
 }
@@ -147,13 +144,13 @@ fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<Strin
 /// Sets the script for the object.
 fn set_script(api: &ExternalEditorApi, guid: &str, script: &str, tag: &str) -> Result<()> {
     // add lua script for object
-    let script = format!(
+    execute!(
+        api,
         r#"
-            return JSON.encode(getObjectFromGUID("{guid}").setLuaScript("{}"))
+            getObjectFromGUID("{guid}").setLuaScript("{}")
         "#,
         script.escape_default()
-    );
-    api.execute(script)?;
+    )?;
 
     println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
     Ok(())
@@ -161,7 +158,8 @@ fn set_script(api: &ExternalEditorApi, guid: &str, script: &str, tag: &str) -> R
 
 /// Returns a list of all guids
 pub fn get_objects(api: &ExternalEditorApi) -> Result<Vec<String>> {
-    let script = format!(
+    execute!(
+        api,
         r#"
             list = {{}}
             for _, obj in pairs(getAllObjects()) do
@@ -169,9 +167,7 @@ pub fn get_objects(api: &ExternalEditorApi) -> Result<Vec<String>> {
             end
             return JSON.encode(list)
         "#,
-    );
-    let objects = api.execute(script)?.return_value;
-    serde_json::from_value(objects).map_err(Error::SerdeError)
+    )
 }
 
 /// Split the tags into valid and non valid tags
