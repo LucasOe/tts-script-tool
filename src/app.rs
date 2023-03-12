@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::messages::*;
+use crate::{messages::*, print_info};
 use colorize::AnsiColor;
 use inquire::Select;
 use regex::Regex;
@@ -19,16 +19,13 @@ pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> 
     };
     guid_exists(api, &guid)?;
     let tag = set_tag(api, file_name, &guid)?;
-    println!(
-        "{} \"{tag}\" as a tag for \"{guid}\"",
-        "added:".yellow().bold()
-    );
+    print_info!("added:", "'{tag}' as a tag for '{guid}'");
     let file_content = fs::read_to_string(path)?;
     set_script(api, &guid, &file_content)?;
-    println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
+    print_info!("updated:", "'{guid}' with tag '{tag}'");
     api.reload(json!([]))?;
-    println!("{}", "reloaded save!".green().bold());
     set_tag(api, file_name, &guid)?;
+    print_info!("reloaded save!");
     println!("To save the applied tag it is recommended to save the game before reloading.");
     Ok(())
 }
@@ -51,7 +48,7 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
             let file_path = get_file_from_tag(path, &tag);
             let file_content = fs::read_to_string(file_path)?;
             set_script(api, &guid, &file_content)?;
-            println!("{} {guid} with tag {tag}", "updated:".yellow().bold());
+            print_info!("updated:", "'{guid}' with tag '{tag}'");
         }
     }
 
@@ -76,7 +73,7 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
         "ui": global_ui
     }]);
     api.reload(message)?;
-    println!("{}", "reloaded save!".green().bold());
+    print_info!("reloaded save!");
 
     Ok(())
 }
@@ -87,11 +84,11 @@ pub fn backup(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
     path.set_extension("json");
     let save_path = api.get_scripts()?.save_path;
     fs::copy(&save_path, &path)?;
-    println!(
-        "{} \"{save_name}\" as \"{path}\"",
-        "save:".yellow().bold(),
-        save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap(),
-        path = path.to_str().unwrap()
+    print_info!(
+        "save:",
+        "'{}' as '{}'",
+        Path::new(&save_path).file_name().unwrap().to_str().unwrap(),
+        path.to_str().unwrap()
     );
     Ok(())
 }
