@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::script_states::{ScriptState, ScriptStates};
-use crate::{messages, print_info};
+use crate::{messages, print_info, reload_save};
 use inquire::Select;
 use regex::Regex;
 use std::fs;
@@ -20,7 +20,7 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guid: Option<String>) -> Res
     messages::set_script(api, &guid, &file_content)?;
     print_info!("updated:", "'{guid}' with tag '{tag}'");
 
-    messages::reload(api)?;
+    reload_save!(api, [])?;
     set_tag(api, file_name, &guid)?;
 
     print_info!("reloaded save!");
@@ -53,13 +53,7 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
         }
     }
 
-    // Get global script and ui and reload the current save
-    let script_states = ScriptStates::new(api)?;
-    let script_state = &script_states.global().unwrap();
-    let global_script = get_global_script(path, script_state)?;
-    let global_ui = get_global_ui(path, script_state)?;
-
-    messages::reload_global(api, global_script, global_ui)?;
+    reload_global(api, path)?;
 
     print_info!("reloaded save!");
     Ok(())
@@ -157,4 +151,17 @@ fn get_global_ui(path: &Path, script_state: &ScriptState) -> Result<String> {
         true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
         false => Ok(script_state.ui()),
     }
+}
+
+/// Get global script and ui and reload the current save.
+/// Gets the global script and ui from files on the provided path first.
+/// If no files exist, it uses the script and the ui from the current save.
+fn reload_global(api: &ExternalEditorApi, path: &Path) -> Result<()> {
+    let script_states = ScriptStates::new(api)?;
+    let script_state = &script_states.global().unwrap();
+    let script = get_global_script(path, script_state)?;
+    let ui = get_global_ui(path, script_state)?;
+
+    reload_save!(api, [{ "guid": "-1", "script": script, "ui": ui }] )?;
+    Ok(())
 }

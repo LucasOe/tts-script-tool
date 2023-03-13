@@ -7,6 +7,14 @@ macro_rules! execute {
 }
 
 #[macro_export]
+macro_rules! reload_save {
+    ($api:ident, $($arg:tt)+) => {{
+		let result = $api.reload(serde_json::json!($($arg)*));
+        result.map_err($crate::error::Error::Io)
+    }}
+}
+
+#[macro_export]
 macro_rules! print_info {
     ($label:expr) => {{
         use colorize::AnsiColor;
