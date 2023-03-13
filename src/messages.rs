@@ -52,8 +52,8 @@ pub fn set_script(api: &ExternalEditorApi, guid: &str, script: &str) -> Result<(
     )
 }
 
-/// Adds a list of tags to an object
-pub fn add_tags(api: &ExternalEditorApi, guid: &str, tags: &Vec<String>) -> Result<()> {
+/// Sets a list of tags for an object
+pub fn set_tags(api: &ExternalEditorApi, guid: &str, tags: &Vec<String>) -> Result<()> {
     let tags = serde_json::to_string(tags)?;
     let escaped_tags = tags.escape_default();
     execute!(
