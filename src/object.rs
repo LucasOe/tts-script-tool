@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::error::{Error, Result};
 use crate::execute;
 use derive_more::{Display, Index, IntoIterator};
@@ -139,16 +137,6 @@ impl Object {
 pub struct Tags(Vec<Tag>);
 
 impl Tags {
-    /// Get a list of tags for an object
-    pub fn request(api: &ExternalEditorApi, guid: &str) -> Result<Self> {
-        execute!(
-            api,
-            r#"
-				return JSON.encode(getObjectFromGUID("{guid}").getTags())
-			"#,
-        )
-    }
-
     pub fn add(&mut self, tag: Tag) {
         self.0.push(tag);
     }
