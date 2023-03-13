@@ -12,11 +12,11 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guid: Option<String>) -> Res
 
     let tag = Tag::from(path);
     set_tag(api, &object, &tag)?;
-    print_info!("added:", "'{tag:?}' as a tag for '{object}'");
+    print_info!("added:", "'{tag}' as a tag for '{object}'");
 
     let script = fs::read_to_string(path)?;
     object.set_script(api, script)?;
-    print_info!("updated:", "'{object}' with tag '{tag:?}'");
+    print_info!("updated:", "'{object}' with tag '{tag}'");
 
     reload_save!(api, [])?;
     set_tag(api, &object, &tag)?;
@@ -34,7 +34,7 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
         if let Some(tag) = tag.valid()? {
             let script = tag.read_file(path)?;
             object.set_script(api, script)?;
-            print_info!("updated:", "'{object:?}' with tag '{tag:?}'");
+            print_info!("updated:", "'{object}' with tag '{tag}'");
         }
     }
 
