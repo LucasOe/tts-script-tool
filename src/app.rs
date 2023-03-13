@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::script_states::ScriptState;
+use crate::script_states::{ScriptState, ScriptStates};
 use crate::{messages, print_info};
 use inquire::Select;
 use regex::Regex;
@@ -54,8 +54,8 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
     }
 
     // Get global script and ui and reload the current save
-    let script_states = messages::get_script_states(api)?;
-    let script_state = script_states.get(0).unwrap();
+    let script_states = ScriptStates::new(api)?;
+    let script_state = &script_states.global().unwrap();
     let global_script = get_global_script(path, script_state)?;
     let global_ui = get_global_ui(path, script_state)?;
 
@@ -145,7 +145,7 @@ fn get_global_script(path: &Path, script_state: &ScriptState) -> Result<String> 
         (true, true) => Err("Global.ttslua and Global.lua both exist on the provided path".into()),
         (true, false) => fs::read_to_string(global_tts).map_err(|_| Error::ReadFile),
         (false, true) => fs::read_to_string(global_lua).map_err(|_| Error::ReadFile),
-        (false, false) => Ok(script_state.clone().script()),
+        (false, false) => Ok(script_state.script()),
     }
 }
 
@@ -155,6 +155,6 @@ fn get_global_ui(path: &Path, script_state: &ScriptState) -> Result<String> {
     let global_xml = Path::new(path).join("./Global.xml");
     match global_xml.exists() {
         true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
-        false => Ok(script_state.clone().ui()),
+        false => Ok(script_state.ui()),
     }
 }
