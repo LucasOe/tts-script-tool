@@ -2,6 +2,7 @@ mod app;
 mod error;
 mod macros;
 mod messages;
+mod script_states;
 
 use app::{attach, backup, reload};
 use clap::{Parser, Subcommand};

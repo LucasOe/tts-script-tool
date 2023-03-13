@@ -1,6 +1,8 @@
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::execute;
+use crate::script_states::ScriptState;
 use std::collections::HashMap;
+use tts_external_api::messages::AnswerReload;
 use tts_external_api::ExternalEditorApi;
 
 /// Returns a list of all object guids in the current save
@@ -65,4 +67,23 @@ pub fn add_tags(api: &ExternalEditorApi, guid: &str, tags: &Vec<String>) -> Resu
             getObjectFromGUID("{guid}").setTags(tags)
         "#
     )
+}
+
+/// Get a vec of ['ScriptState'] structs
+pub fn get_script_states(api: &ExternalEditorApi) -> Result<Vec<ScriptState>> {
+    let script_states = api.get_scripts()?.script_states;
+    serde_json::from_value(script_states).map_err(Error::SerdeError)
+}
+
+/// Reload save without changing anything
+pub fn reload(api: &ExternalEditorApi) -> Result<AnswerReload> {
+    api.reload(serde_json::json!([])).map_err(Error::Io)
+}
+
+/// Reload save with global script and ui
+pub fn reload_global(api: &ExternalEditorApi, script: String, ui: String) -> Result<AnswerReload> {
+    api.reload(serde_json::json!(
+        [{ "guid": "-1", "script": script, "ui": ui }]
+    ))
+    .map_err(Error::Io)
 }
