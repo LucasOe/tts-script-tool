@@ -4,13 +4,12 @@ use thiserror::Error;
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
-
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
-
+    #[error("Error reading from file")]
+    ReadFile,
     #[error("{0}")]
     Msg(String),
 }

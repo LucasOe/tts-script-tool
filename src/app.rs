@@ -10,7 +10,6 @@ use tts_external_api::ExternalEditorApi;
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
 pub fn attach(api: &ExternalEditorApi, path: &Path, guid: Option<String>) -> Result<()> {
-    let path = Path::new(path);
     let file_name = path.file_name().unwrap().to_str().unwrap();
 
     let guid = get_guid(api, guid)?;
@@ -144,8 +143,8 @@ fn get_global_script(path: &Path, script_state: &ScriptState) -> Result<String> 
     let global_lua = Path::new(path).join("./Global.lua");
     match (global_tts.exists(), global_lua.exists()) {
         (true, true) => Err("Global.ttslua and Global.lua both exist on the provided path".into()),
-        (true, false) => fs::read_to_string(global_tts).map_err(Error::Io),
-        (false, true) => fs::read_to_string(global_lua).map_err(Error::Io),
+        (true, false) => fs::read_to_string(global_tts).map_err(|_| Error::ReadFile),
+        (false, true) => fs::read_to_string(global_lua).map_err(|_| Error::ReadFile),
         (false, false) => Ok(script_state.clone().script()),
     }
 }
@@ -155,7 +154,7 @@ fn get_global_script(path: &Path, script_state: &ScriptState) -> Result<String> 
 fn get_global_ui(path: &Path, script_state: &ScriptState) -> Result<String> {
     let global_xml = Path::new(path).join("./Global.xml");
     match global_xml.exists() {
-        true => fs::read_to_string(global_xml).map_err(Error::Io),
+        true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
         false => Ok(script_state.clone().ui()),
     }
 }
