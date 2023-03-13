@@ -176,7 +176,7 @@ impl Tags {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Display)]
 pub struct Tag(String);
 
 impl Tag {
