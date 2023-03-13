@@ -30,32 +30,46 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guid: Option<String>) -> Res
 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
-    let guid_tags = match messages::get_tag_map(api) {
+    let tags_map = match messages::get_tag_map(api) {
         Ok(guid_tags) => Ok(guid_tags),
         Err(_) => Err("The current save has no objects"),
     }?;
 
-    // update scripts with setLuaScript(), so objects without a script get updated.
-    for (guid, tags) in guid_tags {
+    for (guid, tags) in tags_map {
         let (tags, _) = partition_tags(tags);
-        // ensure that the object only has one valid tag
-        let valid_tag: Option<String> = match tags.len() {
-            1 => Some(tags[0].clone()),
+        // Ensure that the object only has one valid tag
+        let valid_tag = match tags.len() {
+            1 => tags.get(0),
             0 => None,
             _ => return Err("{guid} has multiple valid script tags: {tags:?}".into()),
         };
 
+        // Update the script with the file content from the tag
         if let Some(tag) = valid_tag {
-            let file_path = get_file_from_tag(path, &tag);
+            let file_path = get_file_from_tag(path, tag);
             let file_content = fs::read_to_string(file_path)?;
+            // Update scripts with `setLuaScript()` instead of using `api.reload()`,
+            // so objects without a script get updated.
             messages::set_script(api, &guid, &file_content)?;
             print_info!("updated:", "'{guid}' with tag '{tag}'");
         }
     }
 
-    reload_global(api, path)?;
-
+    // Get global script and ui and reload the current save.
+    // Gets the global script and ui from files on the provided path first.
+    // If no files exist, it uses the script and the ui from the current save.
+    let script_states = ScriptStates::new(api)?;
+    let script_state = &script_states.global().unwrap();
+    reload_save!(
+        api,
+        [{
+            "guid": "-1",
+            "script": get_global_script(path, script_state)?,
+            "ui": get_global_ui(path, script_state)?
+        }]
+    )?;
     print_info!("reloaded save!");
+
     Ok(())
 }
 
@@ -65,7 +79,12 @@ pub fn backup(api: &ExternalEditorApi, path: &Path) -> Result<()> {
     let mut path = PathBuf::from(path);
     path.set_extension("json");
     fs::copy(&save_path, &path)?;
-    backup_print(&save_path, &path);
+
+    // Print information about the file
+    let save_name_str = Path::new(&save_path).file_name().unwrap().to_str().unwrap();
+    let path_str = path.to_str().unwrap();
+    print_info!("save:", "'{save_name_str}' as '{path_str}'");
+
     Ok(())
 }
 
@@ -95,16 +114,15 @@ fn select_guid(objects: Vec<String>) -> Result<String> {
 }
 
 /// Add the file as a tag. Tags use "scripts/<File>.ttslua" as a naming convention.
-// Guid has to be global so objects without scripts can execute code.
 fn set_tag(api: &ExternalEditorApi, file_name: &str, guid: &str) -> Result<String> {
-    // get existing tags for object
     let tag = format!("scripts/{file_name}");
-    let tags = messages::get_tags(api, guid)?;
 
-    // set new tags for object
+    // Set new script tag for object and add the previous invalid tags.
+    // Previous valid tags will be overwritten with the new script tag.
+    let tags = messages::get_tags(api, guid)?;
     let (_, mut tags) = partition_tags(tags);
     tags.push(String::from(&tag));
-    messages::add_tags(api, guid, &tags)?;
+    messages::set_tags(api, guid, &tags)?;
 
     Ok(tag)
 }
@@ -120,13 +138,6 @@ fn partition_tags(tags: Vec<String>) -> (Vec<String>, Vec<String>) {
 fn get_file_from_tag(path: &Path, tag: &str) -> String {
     let file_name = Path::new(&tag).file_name().unwrap();
     String::from(path.join(file_name).to_string_lossy())
-}
-
-/// Print information for the backup function
-fn backup_print(save_path: &Path, path: &Path) {
-    let save_name_str = Path::new(&save_path).file_name().unwrap().to_str().unwrap();
-    let path_str = path.to_str().unwrap();
-    print_info!("save:", "'{save_name_str}' as '{path_str}'");
 }
 
 /// Get a global script from a file or get the script from the current save if no file exists.
@@ -151,17 +162,4 @@ fn get_global_ui(path: &Path, script_state: &ScriptState) -> Result<String> {
         true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
         false => Ok(script_state.ui()),
     }
-}
-
-/// Get global script and ui and reload the current save.
-/// Gets the global script and ui from files on the provided path first.
-/// If no files exist, it uses the script and the ui from the current save.
-fn reload_global(api: &ExternalEditorApi, path: &Path) -> Result<()> {
-    let script_states = ScriptStates::new(api)?;
-    let script_state = &script_states.global().unwrap();
-    let script = get_global_script(path, script_state)?;
-    let ui = get_global_ui(path, script_state)?;
-
-    reload_save!(api, [{ "guid": "-1", "script": script, "ui": ui }] )?;
-    Ok(())
 }
