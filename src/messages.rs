@@ -1,6 +1,5 @@
 use crate::error::{Error, Result};
 use crate::execute;
-use crate::script_states::ScriptState;
 use std::collections::HashMap;
 use tts_external_api::messages::AnswerReload;
 use tts_external_api::ExternalEditorApi;
@@ -65,12 +64,6 @@ pub fn add_tags(api: &ExternalEditorApi, guid: &str, tags: &Vec<String>) -> Resu
             getObjectFromGUID("{guid}").setTags(tags)
         "#
     )
-}
-
-/// Get a vec of [`ScriptState`] structs
-pub fn get_script_states(api: &ExternalEditorApi) -> Result<Vec<ScriptState>> {
-    let script_states = api.get_scripts()?.script_states;
-    serde_json::from_value(script_states).map_err(Error::SerdeError)
 }
 
 /// Reload save without changing anything
