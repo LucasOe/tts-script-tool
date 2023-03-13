@@ -19,7 +19,11 @@ impl Objects {
             r#"
                 list = {{}}
                 for _, obj in pairs(getAllObjects()) do
-                    table.insert(list, obj.guid)
+                    table.insert(list, {{
+                        guid = obj.guid,
+                        name = obj.name,
+                        script = obj.script_code,
+                    }})
                 end
                 return JSON.encode(list)
             "#,
