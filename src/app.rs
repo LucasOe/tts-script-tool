@@ -33,7 +33,7 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guid: Option<String>) -> Res
 pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
     let guid_tags = match messages::get_tag_map(api) {
         Ok(guid_tags) => Ok(guid_tags),
-        Err(_) => Err(Error::NoObjects),
+        Err(_) => Err("The current save has no objects"),
     }?;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
@@ -43,7 +43,7 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
         let valid_tag: Option<String> = match tags.len() {
             1 => Some(tags[0].clone()),
             0 => None,
-            _ => return Err(Error::TooManyTags { guid, tags }),
+            _ => return Err("{guid} has multiple valid script tags: {tags:?}".into()),
         };
 
         if let Some(tag) = valid_tag {
@@ -58,7 +58,7 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
     let script_states = messages::get_script_states(api)?;
     let script_state = script_states.get(0).unwrap();
     let global_script = get_global_script(path, script_state)?;
-    let global_ui = get_global_ui(path, script_state);
+    let global_ui = get_global_ui(path, script_state)?;
 
     messages::reload_global(api, global_script, global_ui)?;
 
@@ -90,7 +90,7 @@ fn get_guid(api: &ExternalEditorApi, guid: Option<String>) -> Result<String> {
 fn guid_exists(objects: Vec<String>, guid: String) -> Result<String> {
     match objects.contains(&guid) {
         true => Ok(guid),
-        false => Err(Error::MissingGuid { guid }),
+        false => Err(format!("{guid} does not exist").into()),
     }
 }
 
@@ -137,23 +137,25 @@ fn backup_print(save_path: &Path, path: &Path) {
 }
 
 /// Get a global script from a file or get the script from the current save if no file exists.
-/// Returns [`Error::DuplicateGlobal`] if both "Global.ttslua" and "Global.lua" exist.
+/// Returns [`Error::Msg`] if both "Global.ttslua" and "Global.lua" exist.
+/// If the file exists but can't be read it returns [`Error::Io`].
 fn get_global_script(path: &Path, script_state: &ScriptState) -> Result<String> {
-    match (
-        fs::read_to_string(Path::new(path).join("./Global.ttslua")),
-        fs::read_to_string(Path::new(path).join("./Global.lua")),
-    ) {
-        (Ok(_), Ok(_)) => Err(Error::DuplicateGlobal),
-        (Ok(global_script), Err(_)) => Ok(global_script),
-        (Err(_), Ok(global_script)) => Ok(global_script),
-        (Err(_), Err(_)) => Ok(script_state.clone().script()),
+    let global_tts = Path::new(path).join("./Global.ttslua");
+    let global_lua = Path::new(path).join("./Global.lua");
+    match (global_tts.exists(), global_lua.exists()) {
+        (true, true) => Err("Global.ttslua and Global.lua both exist on the provided path".into()),
+        (true, false) => fs::read_to_string(global_tts).map_err(Error::Io),
+        (false, true) => fs::read_to_string(global_lua).map_err(Error::Io),
+        (false, false) => Ok(script_state.clone().script()),
     }
 }
 
 /// Get a global ui from a file or get the ui from the current save if no file exists.
-fn get_global_ui(path: &Path, script_state: &ScriptState) -> String {
-    match fs::read_to_string(Path::new(path).join("./Global.xml")) {
-        Ok(global_ui) => global_ui,
-        Err(_) => script_state.clone().ui(),
+/// If the file exists but can't be read it returns [`Error::Io`].
+fn get_global_ui(path: &Path, script_state: &ScriptState) -> Result<String> {
+    let global_xml = Path::new(path).join("./Global.xml");
+    match global_xml.exists() {
+        true => fs::read_to_string(global_xml).map_err(Error::Io),
+        false => Ok(script_state.clone().ui()),
     }
 }

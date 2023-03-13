@@ -11,17 +11,20 @@ pub enum Error {
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
 
-    #[error("The current save has no objects")]
-    NoObjects,
+    #[error("{0}")]
+    Msg(String),
+}
 
-    #[error("{guid} has multiple valid script tags: {tags:?}")]
-    TooManyTags { guid: String, tags: Vec<String> },
+impl From<&'static str> for Error {
+    fn from(s: &'static str) -> Self {
+        Error::Msg(s.to_owned())
+    }
+}
 
-    #[error("{guid} does not exist")]
-    MissingGuid { guid: String },
-
-    #[error("Global.ttslua and Global.lua both exist on the provided path")]
-    DuplicateGlobal,
+impl From<String> for Error {
+    fn from(s: String) -> Self {
+        Error::Msg(s)
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
