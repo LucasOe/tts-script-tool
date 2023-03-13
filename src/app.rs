@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::script_states::ScriptState;
 use crate::{messages, print_info};
 use inquire::Select;
 use regex::Regex;
@@ -8,7 +9,7 @@ use tts_external_api::ExternalEditorApi;
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
-pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> Result<()> {
+pub fn attach(api: &ExternalEditorApi, path: &Path, guid: Option<String>) -> Result<()> {
     let path = Path::new(path);
     let file_name = path.file_name().unwrap().to_str().unwrap();
 
@@ -29,8 +30,11 @@ pub fn attach(api: &ExternalEditorApi, path: &PathBuf, guid: Option<String>) -> 
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
-    let guid_tags = messages::get_tag_map(api)?;
+pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
+    let guid_tags = match messages::get_tag_map(api) {
+        Ok(guid_tags) => Ok(guid_tags),
+        Err(_) => Err(Error::NoObjects),
+    }?;
 
     // update scripts with setLuaScript(), so objects without a script get updated.
     for (guid, tags) in guid_tags {
@@ -50,18 +54,11 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
         }
     }
 
+    // Get global script and ui and reload the current save
     let script_states = messages::get_script_states(api)?;
-
-    // add global script to script_list
-    let global_path = Path::new(path).join("./Global.ttslua");
-    // get global script from file and fallback to existing script the from save data
-    let global_script = match fs::read_to_string(global_path) {
-        Ok(global_file_content) => global_file_content,
-        Err(_) => script_states[0].clone().script(),
-    };
-    // get global ui from the save data
-    let global_ui = script_states[0].clone().ui();
-    println!("{:?}", global_script);
+    let script_state = script_states.get(0).unwrap();
+    let global_script = get_global_script(path, script_state)?;
+    let global_ui = get_global_ui(path, script_state);
 
     messages::reload_global(api, global_script, global_ui)?;
 
@@ -70,7 +67,7 @@ pub fn reload(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
 }
 
 /// Backup current save as file
-pub fn backup(api: &ExternalEditorApi, path: &PathBuf) -> Result<()> {
+pub fn backup(api: &ExternalEditorApi, path: &Path) -> Result<()> {
     let save_path = PathBuf::from(api.get_scripts()?.save_path);
     let mut path = PathBuf::from(path);
     path.set_extension("json");
@@ -132,8 +129,31 @@ fn get_file_from_tag(path: &Path, tag: &str) -> String {
     String::from(path.join(file_name).to_string_lossy())
 }
 
+/// Print information for the backup function
 fn backup_print(save_path: &Path, path: &Path) {
     let save_name_str = Path::new(&save_path).file_name().unwrap().to_str().unwrap();
     let path_str = path.to_str().unwrap();
     print_info!("save:", "'{save_name_str}' as '{path_str}'");
+}
+
+/// Get a global script from a file or get the script from the current save if no file exists.
+/// Returns [`Error::DuplicateGlobal`] if both "Global.ttslua" and "Global.lua" exist.
+fn get_global_script(path: &Path, script_state: &ScriptState) -> Result<String> {
+    match (
+        fs::read_to_string(Path::new(path).join("./Global.ttslua")),
+        fs::read_to_string(Path::new(path).join("./Global.lua")),
+    ) {
+        (Ok(_), Ok(_)) => Err(Error::DuplicateGlobal),
+        (Ok(global_script), Err(_)) => Ok(global_script),
+        (Err(_), Ok(global_script)) => Ok(global_script),
+        (Err(_), Err(_)) => Ok(script_state.clone().script()),
+    }
+}
+
+/// Get a global ui from a file or get the ui from the current save if no file exists.
+fn get_global_ui(path: &Path, script_state: &ScriptState) -> String {
+    match fs::read_to_string(Path::new(path).join("./Global.xml")) {
+        Ok(global_ui) => global_ui,
+        Err(_) => script_state.clone().ui(),
+    }
 }

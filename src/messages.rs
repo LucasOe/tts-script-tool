@@ -26,9 +26,7 @@ pub fn get_tag_map(api: &ExternalEditorApi) -> Result<HashMap<String, Vec<String
         r#"
             list = {{}}
             for _, obj in pairs(getAllObjects()) do
-                if obj.hasAnyTag() then
-                    list[obj.guid] = obj.getTags()
-                end
+                list[obj.guid] = obj.getTags()
             end
             return JSON.encode(list)
         "#,
@@ -69,7 +67,7 @@ pub fn add_tags(api: &ExternalEditorApi, guid: &str, tags: &Vec<String>) -> Resu
     )
 }
 
-/// Get a vec of ['ScriptState'] structs
+/// Get a vec of [`ScriptState`] structs
 pub fn get_script_states(api: &ExternalEditorApi) -> Result<Vec<ScriptState>> {
     let script_states = api.get_scripts()?.script_states;
     serde_json::from_value(script_states).map_err(Error::SerdeError)
