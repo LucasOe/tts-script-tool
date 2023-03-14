@@ -4,7 +4,7 @@ use tts_external_api::ExternalEditorApi;
 use ttsst::error::{Error, Result};
 use ttsst::objects::{Object, Objects};
 use ttsst::tags::Tag;
-use ttsst::{print_info, reload_save};
+use ttsst::{print_info, reload};
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
@@ -19,7 +19,7 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guid: Option<String>) -> Res
     object.set_script(api, script)?;
     print_info!("updated:", "'{object}' with tag '{tag}'");
 
-    reload_save!(api, [])?;
+    reload!(api, [])?;
     set_tag(api, &object, &tag)?;
 
     print_info!("reloaded save!");
@@ -44,7 +44,7 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
     // If no files exist, it uses the script and the ui from the current save.
     let script_states = Objects::script_states(api)?;
     let script_state = &script_states.global().unwrap();
-    reload_save!(
+    reload!(
         api,
         [{
             "guid": "-1",
