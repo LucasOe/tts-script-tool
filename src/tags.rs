@@ -7,7 +7,7 @@ use std::path::Path;
 pub struct Tags(Vec<Tag>);
 
 impl Tags {
-    pub fn add(&mut self, tag: Tag) {
+    pub fn push(&mut self, tag: Tag) {
         self.0.push(tag);
     }
 
@@ -16,27 +16,25 @@ impl Tags {
     }
 
     /// Tags that follow the "scripts/<File>.ttslua" naming convention are valid
-    pub fn filter_valid(&self) -> Self {
+    pub fn filter_valid(self) -> Self {
         Self(
-            self.clone()
-                .into_iter()
+            self.into_iter()
                 .filter(|tag| tag.is_valid())
                 .collect::<Vec<Tag>>(),
         )
     }
 
     /// Tags that don't follow the "scripts/<File>.ttslua" naming convention are invalid
-    pub fn filter_invalid(&self) -> Self {
+    pub fn filter_invalid(self) -> Self {
         Self(
-            self.clone()
-                .into_iter()
+            self.into_iter()
                 .filter(|tag| !tag.is_valid())
                 .collect::<Vec<Tag>>(),
         )
     }
 
     /// Get a valid tag
-    pub fn valid(&self) -> Result<Option<Tag>> {
+    pub fn valid(self) -> Result<Option<Tag>> {
         let valid = self.filter_valid();
         match valid.0.len() {
             1 => Ok(valid.0.get(0).cloned()),

@@ -1,3 +1,4 @@
+use inquire::Select;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tts_external_api::ExternalEditorApi;
@@ -42,7 +43,7 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
     // Get global script and ui and reload the current save.
     // Gets the global script and ui from files on the provided path first.
     // If no files exist, it uses the script and the ui from the current save.
-    let script_states = Objects::script_states(api)?;
+    let script_states = Objects::request_script_states(api)?;
     let script_state = &script_states.global().unwrap();
     reload!(
         api,
@@ -73,11 +74,11 @@ pub fn backup(api: &ExternalEditorApi, path: &Path) -> Result<()> {
 }
 
 /// If no guid is provided show a selection of objects in the current save.
-/// Otherwise ensure that the guid provided exists. Returns [`Error::MissingGuid`] if it does not exist.
+/// Otherwise ensure that the guid provided exists.
 fn get_object(api: &ExternalEditorApi, guid: Option<String>) -> Result<Object> {
     match guid {
         Some(guid) => Object::new(guid).exists(api),
-        None => Object::select(api),
+        None => select_object(api),
     }
 }
 
@@ -86,7 +87,7 @@ fn set_tag(api: &ExternalEditorApi, object: &Object, tag: &Tag) -> Result<()> {
     // Set new script tag for object and add the previous invalid tags.
     // Previous valid tags will be overwritten with the new script tag.
     let mut tags = object.tags(api)?.filter_invalid();
-    tags.add(tag.clone());
+    tags.push(tag.clone());
     object.set_tags(api, &tags)?;
     Ok(())
 }
@@ -113,4 +114,12 @@ fn get_global_ui(path: &Path, script_state: &Object) -> Result<String> {
         true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
         false => Ok(script_state.ui()),
     }
+}
+
+/// Show a prompt for selecting an object from the current save
+fn select_object(api: &ExternalEditorApi) -> Result<Object> {
+    let objects = Objects::request(api)?.as_vec();
+    Select::new("Select the object to attach the script to:", objects)
+        .prompt()
+        .map_err(Error::InquireError)
 }
