@@ -118,7 +118,7 @@ fn get_global_ui(path: &Path, script_state: &Object) -> Result<String> {
 
 /// Show a prompt for selecting an object from the current save
 fn select_object(api: &ExternalEditorApi) -> Result<Object> {
-    let objects = Objects::request(api)?.as_vec();
+    let objects = Objects::request(api)?.into_inner();
     Select::new("Select the object to attach the script to:", objects)
         .prompt()
         .map_err(Error::InquireError)

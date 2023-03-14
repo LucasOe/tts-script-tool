@@ -38,6 +38,10 @@ impl Tags {
             _ => Err("{guid} has multiple valid script tags: {tags}".into()),
         }
     }
+
+    pub fn into_inner(self) -> Vec<Tag> {
+        self.0
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Display)]
