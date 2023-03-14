@@ -2,7 +2,6 @@ use crate::error::{Error, Result};
 use crate::execute;
 use crate::tags::Tags;
 use derive_more::{Display, Index, IntoIterator};
-use inquire::Select;
 use serde::{Deserialize, Serialize};
 use tts_external_api::ExternalEditorApi;
 
@@ -29,22 +28,24 @@ impl Objects {
     }
 
     /// Get a list of script states from the current save
-    pub fn script_states(api: &ExternalEditorApi) -> Result<Self> {
+    pub fn request_script_states(api: &ExternalEditorApi) -> Result<Self> {
         let script_states = api.get_scripts()?.script_states;
         serde_json::from_value(script_states).map_err(Error::SerdeError)
     }
 
     /// Get [`Object`] by guid
-    pub fn get(&self, guid: &String) -> Option<Object> {
-        self.0
-            .clone()
-            .into_iter()
+    pub fn find(self, guid: &String) -> Option<Object> {
+        self.into_iter()
             .find(|script_state| &script_state.guid == guid)
     }
 
     /// Get global [`Object`]
-    pub fn global(&self) -> Option<Object> {
-        self.get(&String::from("-1"))
+    pub fn global(self) -> Option<Object> {
+        self.find(&String::from("-1"))
+    }
+
+    pub fn as_vec(self) -> Vec<Object> {
+        self.0
     }
 }
 
@@ -119,16 +120,9 @@ impl Object {
 
     pub fn exists(&self, api: &ExternalEditorApi) -> Result<Self> {
         let objects = Objects::request(api)?;
-        match objects.get(&self.guid) {
+        match objects.find(&self.guid) {
             Some(object) => Ok(object),
             None => Err(format!("{self:?} does not exist").into()),
         }
-    }
-
-    pub fn select(api: &ExternalEditorApi) -> Result<Self> {
-        let objects = Objects::request(api)?.0;
-        Select::new("Select the object to attach the script to:", objects)
-            .prompt()
-            .map_err(Error::InquireError)
     }
 }
