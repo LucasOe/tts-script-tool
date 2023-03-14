@@ -1,16 +1,12 @@
 use crate::error::{Error, Result};
-use derive_more::{Display, Index, IntoIterator};
+use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Deserialize, Serialize, Clone, Debug, IntoIterator, Index)]
+#[derive(Deserialize, Serialize, Clone, Debug, IntoIterator, Deref, DerefMut)]
 pub struct Tags(Vec<Tag>);
 
 impl Tags {
-    pub fn push(&mut self, tag: Tag) {
-        self.0.push(tag);
-    }
-
     pub fn to_json_string(&self) -> Result<String> {
         serde_json::to_string(&self.0).map_err(Error::SerdeError)
     }
@@ -39,7 +35,7 @@ impl Tags {
         match valid.0.len() {
             1 => Ok(valid.0.get(0).cloned()),
             0 => Ok(None),
-            _ => Err("{guid} has multiple valid script tags: {tags:?}".into()),
+            _ => Err("{guid} has multiple valid script tags: {tags}".into()),
         }
     }
 }

@@ -1,11 +1,11 @@
 use crate::error::{Error, Result};
 use crate::execute;
 use crate::tags::Tags;
-use derive_more::{Display, Index, IntoIterator};
+use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use serde::{Deserialize, Serialize};
 use tts_external_api::ExternalEditorApi;
 
-#[derive(Deserialize, Serialize, Clone, Debug, IntoIterator, Index)]
+#[derive(Deserialize, Serialize, Clone, Debug, IntoIterator, Deref, DerefMut)]
 pub struct Objects(Vec<Object>);
 
 impl Objects {
