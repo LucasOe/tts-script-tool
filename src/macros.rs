@@ -7,7 +7,7 @@ macro_rules! execute {
 }
 
 #[macro_export]
-macro_rules! reload_save {
+macro_rules! reload {
     ($api:ident, $($arg:tt)+) => {{
 		let result = $api.reload(serde_json::json!($($arg)*));
         result.map_err($crate::error::Error::Io)
