@@ -1,14 +1,11 @@
 mod app;
-mod error;
-mod macros;
-mod object;
 
 use app::{attach, backup, reload};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
-use error::Result;
 use std::path::PathBuf;
 use tts_external_api::ExternalEditorApi;
+use ttsst::error::Result;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
