@@ -18,7 +18,7 @@ impl Objects {
                 for _, obj in pairs(getAllObjects()) do
                     table.insert(list, {{
                         guid = obj.guid,
-                        name = obj.name,
+                        name = obj.getName() ~= "" and obj.getName() or obj.name,
                         script = obj.script_code,
                     }})
                 end
@@ -50,7 +50,7 @@ impl Objects {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Display)]
-#[display(fmt = "{}", guid)]
+#[display(fmt = "'{}' ({})", guid, "name.clone().unwrap_or_default()")]
 pub struct Object {
     pub guid: String,
     pub name: Option<String>,
