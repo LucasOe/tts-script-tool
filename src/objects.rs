@@ -44,7 +44,7 @@ impl Objects {
         self.find(&String::from("-1"))
     }
 
-    pub fn as_vec(self) -> Vec<Object> {
+    pub fn into_inner(self) -> Vec<Object> {
         self.0
     }
 }
