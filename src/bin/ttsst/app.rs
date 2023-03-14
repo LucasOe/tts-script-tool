@@ -1,9 +1,10 @@
-use crate::error::{Error, Result};
-use crate::object::{Object, Objects, Tag};
-use crate::{print_info, reload_save};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tts_external_api::ExternalEditorApi;
+use ttsst::error::{Error, Result};
+use ttsst::objects::{Object, Objects};
+use ttsst::tags::Tag;
+use ttsst::{print_info, reload_save};
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
