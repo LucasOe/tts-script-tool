@@ -8,6 +8,9 @@ use serde::{de::DeserializeOwned, Serialize};
 
 pub trait JsonObject {
     /// Converts the value to a JSON string.
+    ///
+    /// Newtype structs will serialize and deserialize to the inner value with no wrapper.
+    /// See [Serde Json](https://serde.rs/json.html) for more information.
     fn to_json_string(&self) -> Result<String>
     where
         Self: Serialize + DeserializeOwned,
