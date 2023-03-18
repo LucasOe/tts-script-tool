@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
-use crate::execute;
 use crate::tags::Tags;
+use crate::{execute, JsonObject};
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use serde::{Deserialize, Serialize};
 use tts_external_api::ExternalEditorApi;
@@ -9,6 +9,8 @@ use tts_external_api::ExternalEditorApi;
 /// If constructed using the [`Objects::request_script_states()`] function, the global object will be included.
 #[derive(Deserialize, Serialize, Clone, Debug, IntoIterator, Deref, DerefMut)]
 pub struct Objects(Vec<Object>);
+
+impl JsonObject for Objects {}
 
 impl Objects {
     /// Returns a list of objects loaded in the current save. Only object that are interactable will be included.
@@ -65,22 +67,9 @@ pub struct Object {
     pub ui: Option<String>,
 }
 
-impl Object {
-    /// Constructs a new `Object`.
-    pub fn new(
-        guid: String,
-        name: Option<String>,
-        script: Option<String>,
-        ui: Option<String>,
-    ) -> Self {
-        Self {
-            guid,
-            name,
-            script,
-            ui,
-        }
-    }
+impl JsonObject for Object {}
 
+impl Object {
     /// Returns a list of [`Tags`] in the current save for this object.
     pub fn tags(&self, api: &ExternalEditorApi) -> Result<Tags> {
         execute!(
@@ -94,6 +83,7 @@ impl Object {
 
     /// Sets a list of [`Tags`] in the current save for this object.
     pub fn set_tags(&self, api: &ExternalEditorApi, tags: &Tags) -> Result<()> {
+        println!("{}", tags.to_json_string()?.escape_default());
         execute!(
             api,
             r#"
