@@ -1,21 +1,20 @@
 use crate::error::{Error, Result};
+use crate::JsonObject;
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-/// A list of [`Tags`](Tag) associated with an [`Object`](crate::objects::Object). Tags can be filtered by valid an invalid tags.
+/// A list of [`Tags`](Tag) associated with an [`Object`](crate::objects::Object).
+/// Tags can be filtered by valid an invalid tags.
 #[derive(Deserialize, Serialize, Clone, Debug, IntoIterator, Deref, DerefMut)]
 pub struct Tags(Vec<Tag>);
+
+impl JsonObject for Tags {}
 
 impl Tags {
     /// Consumes `Tags`, returning the wrapped value.
     pub fn into_inner(self) -> Vec<Tag> {
         self.0
-    }
-
-    /// Converts the value to a JSON string.
-    pub fn to_json_string(&self) -> Result<String> {
-        serde_json::to_string(&self.0).map_err(Error::SerdeError)
     }
 
     /// Tags that follow the naming convention defined in [`Tag::is_valid()`] are valid
@@ -52,6 +51,8 @@ impl Tags {
 /// A tag associated with an [`Object`](crate::objects::Object).
 #[derive(Deserialize, Serialize, Clone, Debug, Display)]
 pub struct Tag(String);
+
+impl JsonObject for Tag {}
 
 impl Tag {
     /// Construct a new `Tag`.

@@ -78,7 +78,13 @@ pub fn backup(api: &ExternalEditorApi, path: &Path) -> Result<()> {
 /// Otherwise ensure that the guid provided exists.
 fn get_object(api: &ExternalEditorApi, guid: Option<String>) -> Result<Object> {
     match guid {
-        Some(guid) => Object::new(guid, None, None, None).exists(api),
+        Some(guid) => Object {
+            guid,
+            name: None,
+            script: None,
+            ui: None,
+        }
+        .exists(api),
         None => select_object(api),
     }
 }
