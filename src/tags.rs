@@ -3,15 +3,22 @@ use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+/// A list of [`Tags`](Tag) associated with an [`Object`](crate::objects::Object). Tags can be filtered by valid an invalid tags.
 #[derive(Deserialize, Serialize, Clone, Debug, IntoIterator, Deref, DerefMut)]
 pub struct Tags(Vec<Tag>);
 
 impl Tags {
+    /// Consumes `Tags`, returning the wrapped value.
+    pub fn into_inner(self) -> Vec<Tag> {
+        self.0
+    }
+
+    /// Converts the value to a JSON string.
     pub fn to_json_string(&self) -> Result<String> {
         serde_json::to_string(&self.0).map_err(Error::SerdeError)
     }
 
-    /// Tags that follow the "scripts/<File>.ttslua" naming convention are valid
+    /// Tags that follow the naming convention defined in [`Tag::is_valid()`] are valid
     pub fn filter_valid(self) -> Self {
         Self(
             self.into_iter()
@@ -20,7 +27,7 @@ impl Tags {
         )
     }
 
-    /// Tags that don't follow the "scripts/<File>.ttslua" naming convention are invalid
+    /// Tags that don't follow the naming convention defined in [`Tag::is_valid()`] are invalid
     pub fn filter_invalid(self) -> Self {
         Self(
             self.into_iter()
@@ -29,7 +36,9 @@ impl Tags {
         )
     }
 
-    /// Get a valid tag
+    /// Returns a valid [`Tag`], if the list only contains a single valid tag.
+    /// If it contains no valid Tags it returns [`None`].
+    /// If the list contains multiple valid tags, this function returns an [`Error::Msg`].
     pub fn valid(self) -> Result<Option<Tag>> {
         let valid = self.filter_valid();
         match valid.0.len() {
@@ -38,31 +47,39 @@ impl Tags {
             _ => Err("{guid} has multiple valid script tags: {tags}".into()),
         }
     }
-
-    pub fn into_inner(self) -> Vec<Tag> {
-        self.0
-    }
 }
 
+/// A tag associated with an [`Object`](crate::objects::Object).
 #[derive(Deserialize, Serialize, Clone, Debug, Display)]
 pub struct Tag(String);
 
 impl Tag {
-    /// Create a new tag using `scripts/{file_name}` as a name
+    /// Construct a new `Tag`.
+    pub fn new(inner: String) -> Self {
+        Tag(inner)
+    }
+
+    /// Create a new tag using `scripts/<File>.ttslua` as a name.
     pub fn from(path: &Path) -> Self {
         let file_name = path.file_name().unwrap().to_str().unwrap();
         Self(format!("scripts/{file_name}"))
     }
 
-    /// Tags that follow the "scripts/<File>.ttslua" naming convention are valid
+    /// Tags that follow the `scripts/<File>.ttslua` naming convention are valid.
     pub fn is_valid(&self) -> bool {
         let exprs = regex::Regex::new(r"^(scripts/)[\d\w]+(\.lua|\.ttslua)$").unwrap();
         exprs.is_match(&self.0)
     }
 
+    /// Reads the file from the tag and returns the content, if the tag is valid.
     pub fn read_file(&self, path: &Path) -> Result<String> {
-        let file_name = Path::new(&self.0).file_name().unwrap();
-        let file_path = String::from(path.join(file_name).to_string_lossy());
-        std::fs::read_to_string(file_path).map_err(Error::Io)
+        match self.is_valid() {
+            true => {
+                let file_name = Path::new(&self.0).file_name().unwrap();
+                let file_path = String::from(path.join(file_name).to_string_lossy());
+                std::fs::read_to_string(file_path).map_err(Error::Io)
+            }
+            false => Err("Invalid Tag: {self}".into()),
+        }
     }
 }

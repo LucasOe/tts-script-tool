@@ -1,11 +1,12 @@
+use crate::print_info;
 use inquire::Select;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::{Error, Result};
 use ttsst::objects::{Object, Objects};
+use ttsst::reload;
 use ttsst::tags::Tag;
-use ttsst::{print_info, reload};
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
@@ -77,7 +78,7 @@ pub fn backup(api: &ExternalEditorApi, path: &Path) -> Result<()> {
 /// Otherwise ensure that the guid provided exists.
 fn get_object(api: &ExternalEditorApi, guid: Option<String>) -> Result<Object> {
     match guid {
-        Some(guid) => Object::new(guid).exists(api),
+        Some(guid) => Object::new(guid, None, None, None).exists(api),
         None => select_object(api),
     }
 }
@@ -102,7 +103,7 @@ fn get_global_script(path: &Path, script_state: &Object) -> Result<String> {
         (true, true) => Err("Global.ttslua and Global.lua both exist on the provided path".into()),
         (true, false) => fs::read_to_string(global_tts).map_err(|_| Error::ReadFile),
         (false, true) => fs::read_to_string(global_lua).map_err(|_| Error::ReadFile),
-        (false, false) => Ok(script_state.script()),
+        (false, false) => Ok(script_state.clone().script.unwrap_or_default()),
     }
 }
 
@@ -112,7 +113,7 @@ fn get_global_ui(path: &Path, script_state: &Object) -> Result<String> {
     let global_xml = Path::new(path).join("./Global.xml");
     match global_xml.exists() {
         true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
-        false => Ok(script_state.ui()),
+        false => Ok(script_state.clone().ui.unwrap_or_default()),
     }
 }
 
