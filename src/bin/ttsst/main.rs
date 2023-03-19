@@ -17,22 +17,27 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Attach script to object
+    /// Attach a script to one or more objects
     Attach {
         /// Path to the file that should be attached
         #[arg(value_parser)]
         path: PathBuf,
-        /// Optional: The guid of the object the script should be attached to.
-        /// If not provided a list of all objects will be shown.
+
+        /// Optional: The guid(s) of the object(s) the script should be attached to.
+        ///
+        /// It is possible to attach a script to multiple objects at once.
+        /// If not provided a selection prompt will be shown.
         #[arg(value_parser)]
-        guid: Option<String>,
+        guids: Option<Vec<String>>,
     },
+
     /// Update scripts and reload save
     Reload {
         /// Path to the directory with all scripts
         #[arg(value_parser)]
         path: PathBuf,
     },
+
     /// Backup current save
     Backup {
         /// Path to save location
@@ -53,7 +58,7 @@ fn main() {
 fn run(args: Args) -> Result<()> {
     let api = ExternalEditorApi::new();
     match args.command {
-        Commands::Attach { path, guid } => attach(&api, &path, guid)?,
+        Commands::Attach { path, guids } => attach(&api, &path, guids)?,
         Commands::Backup { path } => backup(&api, &path)?,
         Commands::Reload { path } => reload(&api, &path)?,
     }
