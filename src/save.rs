@@ -14,9 +14,9 @@ use tts_external_api::ExternalEditorApi;
 pub struct Save {
     #[serde(rename = "SaveName")]
     pub save_name: String,
-    #[serde(rename = "LuaScript")]
+    #[serde(rename = "LuaScript", default)]
     pub lua_script: String,
-    #[serde(rename = "XmlUI")]
+    #[serde(rename = "XmlUI", default)]
     pub xml_ui: String,
     #[serde(rename = "ObjectStates")]
     pub object_states: Vec<Object>,
@@ -50,7 +50,7 @@ impl Save {
 
     /// Adds the objects to the existing objects in this `Save`.
     /// Objects with the same guid will be replaced.
-    pub fn add_objects(&mut self, objects: Vec<Object>) -> Result<&Self> {
+    pub fn add_objects(&mut self, objects: &Vec<Object>) -> Result<&Self> {
         for object_state in &mut self.object_states {
             if let Some(object) = objects.iter().find(|object| object == &object_state) {
                 *object_state = object.clone();
@@ -99,7 +99,17 @@ impl PartialEq for Object {
 }
 
 impl Object {
+    /// Return `true` if the object has the same guid
     pub fn has_guid(&self, guid: &String) -> bool {
         &self.guid == guid
+    }
+
+    /// Create a Value used for the [`reload!`] macro.
+    pub fn to_value(&self) -> Value {
+        serde_json::json!({
+            "guid": self.guid,
+            "script": self.lua_script,
+            "ui": self.xml_ui,
+        })
     }
 }

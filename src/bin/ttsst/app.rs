@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::print_info;
 use inquire::MultiSelect;
+use serde_json::Value;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::{Error, Result};
 use ttsst::reload;
@@ -27,15 +28,7 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guids: Option<Vec<String>>) 
         print_info!("added:", "{path:?} as a script to {object}");
     }
 
-    // Overwrite the save file with the modified objects
-    Save::read_save(api)?
-        .add_objects(objects)?
-        .write_save(api)?;
-
-    // Reload new save file
-    reload!(api, [])?; // Todo: Reloading does not reload the save file
-    print_info!("reloaded save!");
-
+    update_objects(api, objects)?;
     Ok(())
 }
 
@@ -86,4 +79,22 @@ fn get_objects(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<Ve
                 .map_err(Error::InquireError)
         }
     }
+}
+
+/// Overwrite the save file and reload the current save,
+/// the same way it get reloaded when pressing “Save & Play” within the in-game editor.
+fn update_objects(api: &ExternalEditorApi, objects: Vec<Object>) -> Result<()> {
+    // Overwrite the save file with the modified objects
+    Save::read_save(api)?
+        .add_objects(&objects)?
+        .write_save(api)?;
+
+    let objects: Vec<Value> = objects
+        .into_iter()
+        .map(|object| object.to_value())
+        .collect();
+
+    reload!(api, objects)?;
+    print_info!("reloaded save!");
+    Ok(())
 }
