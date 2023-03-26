@@ -59,6 +59,13 @@ impl Save {
 
         Ok(self) // Return Self for method chaining
     }
+
+    pub fn find_object(self, guid: &String) -> Result<Object> {
+        self.object_states
+            .into_iter()
+            .find(|object| object.has_guid(guid))
+            .ok_or("{guid} does not exist".into())
+    }
 }
 
 /// An object loaded in the current save or savestate.

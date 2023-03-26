@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::print_info;
 use inquire::MultiSelect;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::{Error, Result};
 use ttsst::reload;
@@ -19,7 +19,7 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guids: Option<Vec<String>>) 
     let script = fs::read_to_string(path)?.replace("\t", "    ");
     // Add tag and script to objects
     for mut object in &mut objects {
-        let mut new_tags = object.clone().tags.filter_invalid(); // Todo: Remove clone if possible
+        let mut new_tags = object.tags.clone().filter_invalid();
         new_tags.push(tag.clone());
         object.tags = new_tags;
         print_info!("added:", "'{tag}' as a tag to {object}");
@@ -28,13 +28,34 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guids: Option<Vec<String>>) 
         print_info!("added:", "{path:?} as a script to {object}");
     }
 
-    update_objects(api, objects)?;
+    let mut save_state = Save::read_save(api)?;
+    let new_save_state = save_state.add_objects(&objects)?;
+
+    update_save(api, new_save_state)?;
     Ok(())
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(_api: &ExternalEditorApi, _path: &Path) -> Result<()> {
-    todo!();
+pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
+    let mut save_state = Save::read_save(api)?;
+
+    // Update the lua script with the file content from the tag
+    // Returns Error if the object has multiple valid tags
+    for mut object in &mut save_state.object_states {
+        let tags = object.tags.clone();
+        if let Some(tag) = tags.valid()? {
+            object.lua_script = tag.read_file(path)?;
+            print_info!("updated:", "{object} with tag '{tag}'");
+        }
+    }
+
+    // Get global script and ui from the files provided on the path.
+    // If no files exist, fallback to the save state from the current save.
+    save_state.lua_script = get_global_script(path, &save_state)?;
+    save_state.xml_ui = get_global_ui(path, &save_state)?;
+
+    update_save(api, &save_state)?;
+    Ok(())
 }
 
 /// Backup current save as file
@@ -55,7 +76,7 @@ pub fn backup(api: &ExternalEditorApi, path: &Path) -> Result<()> {
 /// If no guids are provided show a selection of objects in the current savestate.
 /// Otherwise ensure that the guids provided exist.
 fn get_objects(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<Vec<Object>> {
-    let objects = Save::read_save(api)?.object_states;
+    let save_state = Save::read_save(api)?;
 
     match guids {
         Some(guids) => {
@@ -63,16 +84,11 @@ fn get_objects(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<Ve
             // If `guids` only contains existing objects, a vec with the savestate of those objects will be returned.
             guids
                 .into_iter()
-                .map(|guid| {
-                    objects
-                        .iter()
-                        .find(|object| object.has_guid(&guid))
-                        .cloned()
-                        .ok_or::<Error>(format!("{guid} does not exist").into())
-                })
+                .map(|guid| save_state.clone().find_object(&guid))
                 .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
         }
         None => {
+            let objects = save_state.object_states;
             // Shows a multi selection prompt
             MultiSelect::new("Select the object to attach the script to:", objects)
                 .prompt()
@@ -83,18 +99,49 @@ fn get_objects(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<Ve
 
 /// Overwrite the save file and reload the current save,
 /// the same way it get reloaded when pressing “Save & Play” within the in-game editor.
-fn update_objects(api: &ExternalEditorApi, objects: Vec<Object>) -> Result<()> {
+fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
     // Overwrite the save file with the modified objects
-    Save::read_save(api)?
-        .add_objects(&objects)?
-        .write_save(api)?;
+    save.write_save(api)?;
 
-    let objects: Vec<Value> = objects
-        .into_iter()
+    // Map `Object` to `serde_json::Value`
+    let mut objects = save
+        .object_states
+        .iter()
         .map(|object| object.to_value())
-        .collect();
+        .collect::<Vec<Value>>();
+
+    // Add global script and ui to `objects`
+    objects.push(json!({
+        "guid": "-1",
+        "script": save.lua_script,
+        "ui": save.xml_ui
+    }));
 
     reload!(api, objects)?;
     print_info!("reloaded save!");
     Ok(())
+}
+
+/// Get a global script from a file or fallback to the save state from the current save if no file exists.
+/// Returns [`Error::Msg`] if both "Global.ttslua" and "Global.lua" exist.
+/// If the file exists but can't be read it returns [`Error::Io`].
+fn get_global_script(path: &Path, save_state: &Save) -> Result<String> {
+    let global_tts = Path::new(path).join("./Global.ttslua");
+    let global_lua = Path::new(path).join("./Global.lua");
+    match (global_tts.exists(), global_lua.exists()) {
+        (true, true) => Err("Global.ttslua and Global.lua both exist on the provided path".into()),
+        (true, false) => fs::read_to_string(global_tts).map_err(|_| Error::ReadFile),
+        (false, true) => fs::read_to_string(global_lua).map_err(|_| Error::ReadFile),
+        (false, false) => Ok(save_state.lua_script.clone()),
+    }
+}
+
+/// Get a global ui from a file or fallback to the save state from the current save if no file exists.
+/// If the file exists but can't be read it returns [`Error::Io`].
+fn get_global_ui(path: &Path, save_state: &Save) -> Result<String> {
+    let global_xml = Path::new(path).join("./Global.xml");
+    match global_xml.exists() {
+        true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
+        false => Ok(save_state.xml_ui.clone()),
+    }
 }
