@@ -16,7 +16,7 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guids: Option<Vec<String>>) 
     let mut objects = get_objects(api, guids)?;
 
     let tag = Tag::from(path);
-    let script = fs::read_to_string(path)?.replace("\t", "    ");
+    let script = read_file(path)?;
     // Add tag and script to objects
     for mut object in &mut objects {
         let mut new_tags = object.tags.clone().filter_invalid();
@@ -130,8 +130,8 @@ fn get_global_script(path: &Path, save_state: &Save) -> Result<String> {
     let global_lua = Path::new(path).join("./Global.lua");
     match (global_tts.exists(), global_lua.exists()) {
         (true, true) => Err("Global.ttslua and Global.lua both exist on the provided path".into()),
-        (true, false) => fs::read_to_string(global_tts).map_err(|_| Error::ReadFile),
-        (false, true) => fs::read_to_string(global_lua).map_err(|_| Error::ReadFile),
+        (true, false) => read_file(&global_tts),
+        (false, true) => read_file(&global_lua),
         (false, false) => Ok(save_state.lua_script.clone()),
     }
 }
@@ -144,4 +144,11 @@ fn get_global_ui(path: &Path, save_state: &Save) -> Result<String> {
         true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
         false => Ok(save_state.xml_ui.clone()),
     }
+}
+
+/// Reads a file from the path and replaces every occurrence of `\t` with spaces
+fn read_file(path: &Path) -> Result<String> {
+    fs::read_to_string(path)
+        .map(|content| content.replace("\t", "    "))
+        .map_err(|_| Error::ReadFile)
 }
