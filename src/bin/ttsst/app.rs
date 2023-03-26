@@ -141,7 +141,7 @@ fn get_global_script(path: &Path, save_state: &Save) -> Result<String> {
 fn get_global_ui(path: &Path, save_state: &Save) -> Result<String> {
     let global_xml = Path::new(path).join("./Global.xml");
     match global_xml.exists() {
-        true => fs::read_to_string(global_xml).map_err(|_| Error::ReadFile),
+        true => read_file(&global_xml),
         false => Ok(save_state.xml_ui.clone()),
     }
 }
