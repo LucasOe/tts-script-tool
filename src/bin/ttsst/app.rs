@@ -2,8 +2,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::print_info;
+use colorize::AnsiColor;
 use inquire::MultiSelect;
 use serde_json::{json, Value};
+use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::{Error, Result};
 use ttsst::reload;
@@ -73,6 +75,18 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
 
     update_save(api, &save_state)?;
     Ok(())
+}
+
+/// Read print, log and error messages
+pub fn console(api: &ExternalEditorApi) -> Result<()> {
+    loop {
+        match api.read() {
+            Answer::AnswerPrint(answer) => println!("{}", answer.message.b_grey()),
+            Answer::AnswerReload(_answer) => println!("{}", "Loading complete.".green()),
+            Answer::AnswerError(answer) => println!("{}", answer.error_message_prefix.red()),
+            _ => {}
+        }
+    }
 }
 
 /// Backup current save as file
