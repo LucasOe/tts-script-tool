@@ -14,7 +14,7 @@ use ttsst::tags::Tag;
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
-pub fn attach(api: &ExternalEditorApi, path: &Path, guids: Option<Vec<String>>) -> Result<()> {
+pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>) -> Result<()> {
     let mut objects = get_objects(api, guids, "Select the object to attach the script to:")?;
 
     let tag = Tag::from(&path);
@@ -55,7 +55,7 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()>
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
+pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
     let mut save_state = Save::read_save(api)?;
 
     // Update the lua script with the file content from the tag
@@ -63,22 +63,22 @@ pub fn reload(api: &ExternalEditorApi, path: &Path) -> Result<()> {
     for mut object in &mut save_state.object_states {
         let tags = object.tags.clone();
         if let Some(tag) = tags.valid()? {
-            object.lua_script = tag.read_file(path)?;
+            object.lua_script = tag.read_file(&path)?;
             print_info!("updated:", "{object} with tag '{tag}'");
         }
     }
 
     // Get global script and ui from the files provided on the path.
     // If no files exist, fallback to the save state from the current save.
-    save_state.lua_script = get_global_script(path, &save_state)?;
-    save_state.xml_ui = get_global_ui(path, &save_state)?;
+    save_state.lua_script = get_global_script(&path, &save_state)?;
+    save_state.xml_ui = get_global_ui(&path, &save_state)?;
 
     update_save(api, &save_state)?;
     Ok(())
 }
 
 /// Read print, log and error messages
-pub fn console(api: &ExternalEditorApi) -> Result<()> {
+pub fn console(api: &ExternalEditorApi, _watch: Option<PathBuf>) -> Result<()> {
     loop {
         match api.read() {
             Answer::AnswerPrint(answer) => println!("{}", answer.message.b_grey()),
@@ -90,9 +90,8 @@ pub fn console(api: &ExternalEditorApi) -> Result<()> {
 }
 
 /// Backup current save as file
-pub fn backup(api: &ExternalEditorApi, path: &Path) -> Result<()> {
-    let save_path = PathBuf::from(api.get_scripts()?.save_path);
-    let mut path = PathBuf::from(path);
+pub fn backup(api: &ExternalEditorApi, mut path: PathBuf) -> Result<()> {
+    let save_path = api.get_scripts()?.save_path;
     path.set_extension("json");
     fs::copy(&save_path, &path)?;
 
@@ -184,6 +183,6 @@ fn get_global_ui(path: &Path, save_state: &Save) -> Result<String> {
 /// Reads a file from the path and replaces every occurrence of `\t` with spaces
 fn read_file(path: &Path) -> Result<String> {
     fs::read_to_string(path)
-        .map(|content| content.replace("\t", "    "))
+        .map(|content| content.replace('\t', "    "))
         .map_err(|_| Error::ReadFile)
 }

@@ -50,7 +50,7 @@ impl Save {
 
     /// Adds the objects to the existing objects in this `Save`.
     /// Objects with the same guid will be replaced.
-    pub fn add_objects(&mut self, objects: &Vec<Object>) -> Result<&Self> {
+    pub fn add_objects(&mut self, objects: &[Object]) -> Result<&Self> {
         for object_state in &mut self.object_states {
             if let Some(object) = objects.iter().find(|object| object == &object_state) {
                 *object_state = object.clone();
