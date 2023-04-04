@@ -22,20 +22,14 @@ enum Commands {
         #[arg(value_parser)]
         path: PathBuf,
 
-        /// Optional: The guid(s) of the object(s) the script should be attached to.
-        ///
-        /// It is possible to attach a script to multiple objects at once.
-        /// If guids are not provided a selection prompt will be shown.
+        /// Optional: The guid(s) of the object(s) the script should be attached to
         #[arg(value_parser)]
         guids: Option<Vec<String>>,
     },
 
     /// Detach a script from one or more objects
     Detach {
-        /// Optional: The guid(s) of the object(s) the script should be detached from.
-        ///
-        /// It is possible to detach a script from multiple objects at once.
-        /// If guids are not provided a selection prompt will be shown.
+        /// Optional: The guid(s) of the object(s) the script should be detached from
         #[arg(value_parser)]
         guids: Option<Vec<String>>,
     },
@@ -49,7 +43,7 @@ enum Commands {
 
     /// Show print, log and error messages in the console
     Console {
-        /// watch a directory
+        /// Optional: Directory to be watched
         #[arg(short, long)]
         watch: Option<PathBuf>,
     },
