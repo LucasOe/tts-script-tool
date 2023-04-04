@@ -47,6 +47,9 @@ enum Commands {
         path: PathBuf,
     },
 
+    /// Show print, log and error messages in the console
+    Console {},
+
     /// Backup current save
     Backup {
         /// Path to save location
@@ -70,6 +73,7 @@ fn run(args: Args) -> Result<()> {
         Commands::Attach { path, guids } => app::attach(&api, &path, guids)?,
         Commands::Detach { guids } => app::detach(&api, guids)?,
         Commands::Backup { path } => app::backup(&api, &path)?,
+        Commands::Console {} => app::console(&api)?,
         Commands::Reload { path } => app::reload(&api, &path)?,
     }
     Ok(())
