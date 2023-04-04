@@ -13,10 +13,10 @@ use ttsst::tags::Tag;
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
 pub fn attach(api: &ExternalEditorApi, path: &Path, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(api, guids)?;
+    let mut objects = get_objects(api, guids, "Select the object to attach the script to:")?;
 
-    let tag = Tag::from(path);
-    let script = read_file(path)?;
+    let tag = Tag::from(&path);
+    let script = read_file(&path)?;
     // Add tag and script to objects
     for mut object in &mut objects {
         let mut new_tags = object.tags.clone().filter_invalid();
@@ -26,6 +26,23 @@ pub fn attach(api: &ExternalEditorApi, path: &Path, guids: Option<Vec<String>>) 
 
         object.lua_script = script.clone();
         print_info!("added:", "{path:?} as a script to {object}");
+    }
+
+    let mut save_state = Save::read_save(api)?;
+    let new_save_state = save_state.add_objects(&objects)?;
+
+    update_save(api, new_save_state)?;
+    Ok(())
+}
+
+pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()> {
+    let mut objects = get_objects(api, guids, "Select the object to detach the script from:")?;
+
+    // Remove tags and script from objects
+    for mut object in &mut objects {
+        let new_tags = object.tags.clone().filter_invalid();
+        object.tags = new_tags;
+        object.lua_script = String::new();
     }
 
     let mut save_state = Save::read_save(api)?;
@@ -75,7 +92,11 @@ pub fn backup(api: &ExternalEditorApi, path: &Path) -> Result<()> {
 
 /// If no guids are provided show a selection of objects in the current savestate.
 /// Otherwise ensure that the guids provided exist.
-fn get_objects(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<Vec<Object>> {
+fn get_objects(
+    api: &ExternalEditorApi,
+    guids: Option<Vec<String>>,
+    message: &str,
+) -> Result<Vec<Object>> {
     let save_state = Save::read_save(api)?;
 
     match guids {
@@ -90,7 +111,7 @@ fn get_objects(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<Ve
         None => {
             let objects = save_state.object_states;
             // Shows a multi selection prompt
-            MultiSelect::new("Select the object to attach the script to:", objects)
+            MultiSelect::new(message, objects)
                 .prompt()
                 .map_err(Error::InquireError)
         }

@@ -1,7 +1,6 @@
 mod app;
 mod macros;
 
-use app::{attach, backup, reload};
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
 use std::path::PathBuf;
@@ -26,7 +25,17 @@ enum Commands {
         /// Optional: The guid(s) of the object(s) the script should be attached to.
         ///
         /// It is possible to attach a script to multiple objects at once.
-        /// If not provided a selection prompt will be shown.
+        /// If guids are not provided a selection prompt will be shown.
+        #[arg(value_parser)]
+        guids: Option<Vec<String>>,
+    },
+
+    /// Detach a script from one or more objects
+    Detach {
+        /// Optional: The guid(s) of the object(s) the script should be detached from.
+        ///
+        /// It is possible to detach a script from multiple objects at once.
+        /// If guids are not provided a selection prompt will be shown.
         #[arg(value_parser)]
         guids: Option<Vec<String>>,
     },
@@ -58,9 +67,10 @@ fn main() {
 fn run(args: Args) -> Result<()> {
     let api = ExternalEditorApi::new();
     match args.command {
-        Commands::Attach { path, guids } => attach(&api, &path, guids)?,
-        Commands::Backup { path } => backup(&api, &path)?,
-        Commands::Reload { path } => reload(&api, &path)?,
+        Commands::Attach { path, guids } => app::attach(&api, &path, guids)?,
+        Commands::Detach { guids } => app::detach(&api, guids)?,
+        Commands::Backup { path } => app::backup(&api, &path)?,
+        Commands::Reload { path } => app::reload(&api, &path)?,
     }
     Ok(())
 }
