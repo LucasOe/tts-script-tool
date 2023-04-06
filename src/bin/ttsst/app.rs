@@ -1,4 +1,5 @@
 use std::fs;
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 
 use crate::{console, print_info};
@@ -84,7 +85,7 @@ pub fn console(api: ExternalEditorApi, _watch: Option<PathBuf>) -> Result<()> {
     let watch_handle = console::watch(
         // Constructs a new `ExternalEditorApi` listening to port 39997
         tts_external_api::ExternalEditorApi {
-            listener: std::net::TcpListener::bind("127.0.0.1:39997")?,
+            listener: TcpListener::bind("127.0.0.1:39997")?,
         },
     );
 
