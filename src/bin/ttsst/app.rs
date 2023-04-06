@@ -5,6 +5,7 @@ use crate::print_info;
 use colorize::AnsiColor;
 use inquire::MultiSelect;
 use serde_json::{json, Value};
+use std::thread::{self, JoinHandle};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::{Error, Result};
@@ -14,8 +15,8 @@ use ttsst::tags::Tag;
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
-pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(api, guids, "Select the object to attach the script to:")?;
+pub fn attach(api: ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>) -> Result<()> {
+    let mut objects = get_objects(&api, guids, "Select the object to attach the script to:")?;
 
     let tag = Tag::from(&path);
     let script = read_file(&path)?;
@@ -30,15 +31,15 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>
         print_info!("added:", "{path:?} as a script to {object}");
     }
 
-    let mut save_state = Save::read_save(api)?;
+    let mut save_state = Save::read_save(&api)?;
     let new_save_state = save_state.add_objects(&objects)?;
 
-    update_save(api, new_save_state)?;
+    update_save(&api, new_save_state)?;
     Ok(())
 }
 
-pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(api, guids, "Select the object to detach the script from:")?;
+pub fn detach(api: ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()> {
+    let mut objects = get_objects(&api, guids, "Select the object to detach the script from:")?;
 
     // Remove tags and script from objects
     for mut object in &mut objects {
@@ -47,16 +48,16 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()>
         object.lua_script = String::new();
     }
 
-    let mut save_state = Save::read_save(api)?;
+    let mut save_state = Save::read_save(&api)?;
     let new_save_state = save_state.add_objects(&objects)?;
 
-    update_save(api, new_save_state)?;
+    update_save(&api, new_save_state)?;
     Ok(())
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
-    let mut save_state = Save::read_save(api)?;
+pub fn reload(api: ExternalEditorApi, path: PathBuf) -> Result<()> {
+    let mut save_state = Save::read_save(&api)?;
 
     // Update the lua script with the file content from the tag
     // Returns Error if the object has multiple valid tags
@@ -73,24 +74,32 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
     save_state.lua_script = get_global_script(&path, &save_state)?;
     save_state.xml_ui = get_global_ui(&path, &save_state)?;
 
-    update_save(api, &save_state)?;
+    update_save(&api, &save_state)?;
     Ok(())
 }
 
 /// Read print, log and error messages
-pub fn console(api: &ExternalEditorApi, _watch: Option<PathBuf>) -> Result<()> {
-    loop {
-        match api.read() {
-            Answer::AnswerPrint(answer) => println!("{}", answer.message.b_grey()),
-            Answer::AnswerReload(_answer) => println!("{}", "Loading complete.".green()),
-            Answer::AnswerError(answer) => println!("{}", answer.error_message_prefix.red()),
-            _ => {}
-        }
-    }
+pub fn console(api: ExternalEditorApi, _watch: Option<PathBuf>) -> Result<()> {
+    // Console thread listens to the print, log and error messages in the console
+    let console_handle = console_thread(api);
+
+    // Watch thread listens to file changes in the `watch` directory
+    let watch_handle = watch_thread(
+        // Constructs a new `ExternalEditorApi` listening to port 39997
+        tts_external_api::ExternalEditorApi {
+            listener: std::net::TcpListener::bind("127.0.0.1:39997")?,
+        },
+    );
+
+    // Wait for threads to finish. Threads should only finish if they return an error
+    console_handle.join().unwrap()?;
+    watch_handle.join().unwrap()?;
+
+    Ok(())
 }
 
 /// Backup current save as file
-pub fn backup(api: &ExternalEditorApi, mut path: PathBuf) -> Result<()> {
+pub fn backup(api: ExternalEditorApi, mut path: PathBuf) -> Result<()> {
     let save_path = api.get_scripts()?.save_path;
     path.set_extension("json");
     fs::copy(&save_path, &path)?;
@@ -185,4 +194,41 @@ fn read_file(path: &Path) -> Result<String> {
     fs::read_to_string(path)
         .map(|content| content.replace('\t', "    "))
         .map_err(|_| Error::ReadFile)
+}
+
+/// Spawns a new thread that listens to the print, log and error messages in the console
+/// All messages get forwarded to port 39997 so that they can be used again
+fn console_thread(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
+    thread::spawn(move || -> Result<()> {
+        // Create stream on port 39997 to allow the construction of a second `ExternalEditorApi` without errors
+        let _stream = std::net::TcpStream::connect("127.0.0.1:39997");
+
+        loop {
+            match api.read() {
+                Answer::AnswerPrint(answer) => {
+                    println!("{}", answer.message.b_grey())
+                }
+                Answer::AnswerReload(_answer) => {
+                    println!("{}", "Loading complete.".green())
+                }
+                Answer::AnswerError(answer) => {
+                    println!("{}", answer.error_message_prefix.red())
+                }
+                _ => {}
+            }
+        }
+
+        // TODO: Forward messages to TcpStream
+    })
+}
+
+/// Spawns a new thread that listens to file changes in the `watch` directory
+fn watch_thread(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
+    thread::spawn(move || -> Result<()> {
+        // Accept the incoming TcpStream
+        api.listener.accept()?;
+        loop {
+            thread::sleep(std::time::Duration::from_secs(1));
+        }
+    })
 }
