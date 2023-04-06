@@ -48,10 +48,11 @@ pub fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
 
         loop {
             if let Ok(events) = rx.recv().unwrap() {
-                if let Some(event) = events
+                let event = events
                     .into_iter()
-                    .find(|event| event.kind == debouncer::DebouncedEventKind::Any)
-                {
+                    .find(|event| event.kind == debouncer::DebouncedEventKind::Any);
+
+                if let Some(event) = event {
                     println!("Event: {:?}", event.path);
                 }
             }

@@ -59,8 +59,7 @@ pub fn reload(api: ExternalEditorApi, path: PathBuf) -> Result<()> {
     // Update the lua script with the file content from the tag
     // Returns Error if the object has multiple valid tags
     for mut object in &mut save_state.object_states {
-        let tags = object.tags.clone();
-        if let Some(tag) = tags.valid()? {
+        if let Some(tag) = object.tags.clone().valid()? {
             object.lua_script = tag.read_file(&path)?;
             print_info!("updated:", "{object} with tag '{tag}'");
         }
@@ -80,7 +79,7 @@ pub fn console(api: ExternalEditorApi, watch: Option<PathBuf>) -> Result<()> {
     // Console thread listens to the print, log and error messages in the console
     let console_handle = console::console(api);
     // Watch thread listens to file changes in the `watch` directory
-    let watch_handle = watch.map(|path| console::watch(path));
+    let watch_handle = watch.map(console::watch);
 
     // Wait for threads to finish. Threads should only finish if they return an error
     console_handle.join().unwrap()?;
