@@ -1,4 +1,5 @@
 mod app;
+mod console;
 mod macros;
 
 use clap::{Parser, Subcommand};

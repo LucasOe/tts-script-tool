@@ -1,12 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::print_info;
-use colorize::AnsiColor;
+use crate::{console, print_info};
 use inquire::MultiSelect;
 use serde_json::{json, Value};
-use std::thread::{self, JoinHandle};
-use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::{Error, Result};
 use ttsst::reload;
@@ -81,10 +78,10 @@ pub fn reload(api: ExternalEditorApi, path: PathBuf) -> Result<()> {
 /// Read print, log and error messages
 pub fn console(api: ExternalEditorApi, _watch: Option<PathBuf>) -> Result<()> {
     // Console thread listens to the print, log and error messages in the console
-    let console_handle = console_thread(api);
+    let console_handle = console::console(api);
 
     // Watch thread listens to file changes in the `watch` directory
-    let watch_handle = watch_thread(
+    let watch_handle = console::watch(
         // Constructs a new `ExternalEditorApi` listening to port 39997
         tts_external_api::ExternalEditorApi {
             listener: std::net::TcpListener::bind("127.0.0.1:39997")?,
@@ -194,41 +191,4 @@ fn read_file(path: &Path) -> Result<String> {
     fs::read_to_string(path)
         .map(|content| content.replace('\t', "    "))
         .map_err(|_| Error::ReadFile)
-}
-
-/// Spawns a new thread that listens to the print, log and error messages in the console
-/// All messages get forwarded to port 39997 so that they can be used again
-fn console_thread(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
-    thread::spawn(move || -> Result<()> {
-        // Create stream on port 39997 to allow the construction of a second `ExternalEditorApi` without errors
-        let _stream = std::net::TcpStream::connect("127.0.0.1:39997");
-
-        loop {
-            match api.read() {
-                Answer::AnswerPrint(answer) => {
-                    println!("{}", answer.message.b_grey())
-                }
-                Answer::AnswerReload(_answer) => {
-                    println!("{}", "Loading complete.".green())
-                }
-                Answer::AnswerError(answer) => {
-                    println!("{}", answer.error_message_prefix.red())
-                }
-                _ => {}
-            }
-        }
-
-        // TODO: Forward messages to TcpStream
-    })
-}
-
-/// Spawns a new thread that listens to file changes in the `watch` directory
-fn watch_thread(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
-    thread::spawn(move || -> Result<()> {
-        // Accept the incoming TcpStream
-        api.listener.accept()?;
-        loop {
-            thread::sleep(std::time::Duration::from_secs(1));
-        }
-    })
 }
