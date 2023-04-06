@@ -13,21 +13,15 @@ pub fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
         loop {
             let buffer = api.read_string();
             match serde_json::from_str(&buffer)? {
-                Answer::AnswerPrint(answer) => {
-                    println!("{}", answer.message.b_grey())
-                }
-                Answer::AnswerReload(_answer) => {
-                    println!("{}", "Loading complete.".green())
-                }
-                Answer::AnswerError(answer) => {
-                    println!("{}", answer.error_message_prefix.red())
-                }
+                Answer::AnswerPrint(answer) => println!("{}", answer.message.b_grey()),
+                Answer::AnswerReload(_answer) => println!("{}", "Loading complete.".green()),
+                Answer::AnswerError(answer) => println!("{}", answer.error_message_prefix.red()),
                 _ => {}
             }
 
             // Forward the message to the TcpStream on port 39997 if a connection exists
             if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
-                stream.write_all(&buffer.as_bytes())?;
+                stream.write_all(buffer.as_bytes())?;
                 stream.flush()?;
             }
         }
