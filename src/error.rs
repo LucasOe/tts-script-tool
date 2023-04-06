@@ -8,6 +8,8 @@ pub enum Error {
     InquireError(#[from] inquire::InquireError),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
+    #[error(transparent)]
+    NotifyError(#[from] notify::Error),
     #[error("Error reading from file")]
     ReadFile,
     #[error("{0}")]

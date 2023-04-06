@@ -76,15 +76,17 @@ pub fn reload(api: ExternalEditorApi, path: PathBuf) -> Result<()> {
 }
 
 /// Read print, log and error messages
-pub fn console(api: ExternalEditorApi, _watch: Option<PathBuf>) -> Result<()> {
+pub fn console(api: ExternalEditorApi, watch: Option<PathBuf>) -> Result<()> {
     // Console thread listens to the print, log and error messages in the console
     let console_handle = console::console(api);
     // Watch thread listens to file changes in the `watch` directory
-    let watch_handle = console::watch();
+    let watch_handle = watch.map(|path| console::watch(path));
 
     // Wait for threads to finish. Threads should only finish if they return an error
     console_handle.join().unwrap()?;
-    watch_handle.join().unwrap()?;
+    if let Some(watch_handle) = watch_handle {
+        watch_handle.join().unwrap()?;
+    }
 
     Ok(())
 }
