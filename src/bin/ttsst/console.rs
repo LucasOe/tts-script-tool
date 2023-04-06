@@ -1,6 +1,8 @@
 use colorize::AnsiColor;
+use notify::{RecursiveMode, Watcher};
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
 use std::thread::{self, JoinHandle};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
@@ -30,16 +32,21 @@ pub fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
 /// This thread uses its own `ExternalEditorApi` listening to port 39997.
-pub fn watch() -> JoinHandle<Result<()>> {
+pub fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
     thread::spawn(move || -> Result<()> {
         // Constructs a new `ExternalEditorApi` listening to port 39997
-        let api = tts_external_api::ExternalEditorApi {
+        let _api = tts_external_api::ExternalEditorApi {
             listener: TcpListener::bind("127.0.0.1:39997")?,
         };
 
+        // Create notify watcher
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut watcher = notify::recommended_watcher(sender)?;
+        watcher.watch(&path, RecursiveMode::Recursive)?;
+
         loop {
-            thread::sleep(std::time::Duration::from_secs(5));
-            api.execute(r#"print("Hello")"#.to_string())?;
+            let event = receiver.recv().unwrap()?;
+            println!("Paths: {:?}", event.paths)
         }
     })
 }
