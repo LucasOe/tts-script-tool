@@ -1,9 +1,11 @@
-use colorize::AnsiColor;
-use notify::{RecursiveMode, Watcher};
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
+
+use colorize::AnsiColor;
+use notify_debouncer_mini::{self as debouncer, notify::*};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
@@ -40,13 +42,19 @@ pub fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
         };
 
         // Create notify watcher
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let mut watcher = notify::recommended_watcher(sender)?;
-        watcher.watch(&path, RecursiveMode::Recursive)?;
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut debouncer = debouncer::new_debouncer(Duration::from_millis(500), None, tx)?;
+        debouncer.watcher().watch(&path, RecursiveMode::Recursive)?;
 
         loop {
-            let event = receiver.recv().unwrap()?;
-            println!("Paths: {:?}", event.paths)
+            if let Ok(events) = rx.recv().unwrap() {
+                if let Some(event) = events
+                    .into_iter()
+                    .find(|event| event.kind == debouncer::DebouncedEventKind::Any)
+                {
+                    println!("Event: {:?}", event.path);
+                }
+            }
         }
     })
 }
