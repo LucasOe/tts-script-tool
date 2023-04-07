@@ -10,9 +10,21 @@ use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 
+/// Show print, log and error messages in the console.
+/// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
+pub fn start(api: ExternalEditorApi, path: Option<PathBuf>) -> Result<()> {
+    let console_handle = console(api);
+    let watch_handle = path.map(watch);
+
+    // Wait for threads to finish. Threads should only finish if they return an error.
+    console_handle.join().unwrap()?;
+    watch_handle.map(|handle| handle.join().unwrap());
+    Err("console loop was aborted".into())
+}
+
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
-pub fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
+fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
     thread::spawn(move || -> Result<()> {
         loop {
             let buffer = api.read_string();
@@ -35,7 +47,7 @@ pub fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
 /// This thread uses its own `ExternalEditorApi` listening to port 39997.
-pub fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
+fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
     thread::spawn(move || -> Result<()> {
         // Constructs a new `ExternalEditorApi` listening to port 39997
         let api = tts_external_api::ExternalEditorApi {

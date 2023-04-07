@@ -72,7 +72,7 @@ fn run(args: Args) -> Result<()> {
         Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
         Commands::Detach { guids } => app::detach(&api, guids)?,
         Commands::Backup { path } => app::backup(&api, path)?,
-        Commands::Console { watch } => app::console(api, watch)?,
+        Commands::Console { watch } => console::start(api, watch)?,
         Commands::Reload { path } => app::reload(&api, path)?,
     }
     Ok(())

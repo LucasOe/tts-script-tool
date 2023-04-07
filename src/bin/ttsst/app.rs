@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{console, print_info};
+use crate::print_info;
 use inquire::MultiSelect;
 use serde_json::{json, Value};
 use tts_external_api::ExternalEditorApi;
@@ -73,22 +73,6 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
     save_state.xml_ui = get_global_ui(&path, &save_state)?;
 
     update_save(api, &save_state)?;
-    Ok(())
-}
-
-/// Read print, log and error messages
-pub fn console(api: ExternalEditorApi, watch: Option<PathBuf>) -> Result<()> {
-    // Console thread listens to the print, log and error messages in the console
-    let console_handle = console::console(api);
-    // Watch thread listens to file changes in the `watch` directory
-    let watch_handle = watch.map(console::watch);
-
-    // Wait for threads to finish. Threads should only finish if they return an error
-    console_handle.join().unwrap()?;
-    if let Some(watch_handle) = watch_handle {
-        watch_handle.join().unwrap()?;
-    }
-
     Ok(())
 }
 
