@@ -69,13 +69,23 @@ impl Tag {
 
     /// Reads the file from the tag and returns the content, if the tag is valid.
     pub fn read_file(&self, path: &Path) -> Result<String> {
-        match self.is_valid() {
-            true => {
-                let file_name = Path::new(&self.0).file_name().unwrap();
-                let file_path = String::from(path.join(file_name).to_string_lossy());
-                std::fs::read_to_string(file_path).map_err(Error::Io)
-            }
-            false => Err("Invalid Tag: {self}".into()),
+        if self.is_valid() {
+            let file_name = Path::new(&self.0).file_name().unwrap();
+            let path_dir = match path.is_file() {
+                true => path.parent().unwrap(),
+                false => path,
+            };
+            let file_path = String::from(path_dir.join(file_name).to_string_lossy());
+            std::fs::read_to_string(file_path).map_err(Error::Io)
+        } else {
+            Err("Invalid Tag: {self}".into())
         }
+    }
+
+    /// Returns true if the tag equals the path
+    pub fn is_path(&self, path: &Path) -> bool {
+        let tag_name = Path::new(&self.0).file_name().unwrap();
+        let path_name = path.file_name().unwrap();
+        tag_name == path_name
     }
 }

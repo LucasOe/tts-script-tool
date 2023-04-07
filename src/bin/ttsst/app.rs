@@ -60,8 +60,10 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
     // Returns Error if the object has multiple valid tags
     for mut object in &mut save_state.object_states {
         if let Some(tag) = object.tags.clone().valid()? {
-            object.lua_script = tag.read_file(&path)?;
-            print_info!("updated:", "{object} with tag '{tag}'");
+            if (path.is_file() && tag.is_path(&path)) || path.is_dir() {
+                object.lua_script = tag.read_file(&path)?;
+                print_info!("updated:", "{object} with tag '{tag}'");
+            }
         }
     }
 
