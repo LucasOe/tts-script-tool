@@ -37,7 +37,7 @@ pub fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
 pub fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
     thread::spawn(move || -> Result<()> {
         // Constructs a new `ExternalEditorApi` listening to port 39997
-        let _api = tts_external_api::ExternalEditorApi {
+        let api = tts_external_api::ExternalEditorApi {
             listener: TcpListener::bind("127.0.0.1:39997")?,
         };
 
@@ -53,7 +53,7 @@ pub fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
                     .find(|event| event.kind == debouncer::DebouncedEventKind::Any);
 
                 if let Some(event) = event {
-                    println!("Event: {:?}", event.path);
+                    crate::app::reload(&api, event.path)?;
                 }
             }
         }

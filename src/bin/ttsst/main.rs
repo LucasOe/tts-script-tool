@@ -69,11 +69,11 @@ fn main() {
 fn run(args: Args) -> Result<()> {
     let api = ExternalEditorApi::new();
     match args.command {
-        Commands::Attach { path, guids } => app::attach(api, path, guids)?,
-        Commands::Detach { guids } => app::detach(api, guids)?,
-        Commands::Backup { path } => app::backup(api, path)?,
+        Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
+        Commands::Detach { guids } => app::detach(&api, guids)?,
+        Commands::Backup { path } => app::backup(&api, path)?,
         Commands::Console { watch } => app::console(api, watch)?,
-        Commands::Reload { path } => app::reload(api, path)?,
+        Commands::Reload { path } => app::reload(&api, path)?,
     }
     Ok(())
 }

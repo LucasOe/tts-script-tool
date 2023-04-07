@@ -12,8 +12,8 @@ use ttsst::tags::Tag;
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
-pub fn attach(api: ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(&api, guids, "Select the object to attach the script to:")?;
+pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>) -> Result<()> {
+    let mut objects = get_objects(api, guids, "Select the object to attach the script to:")?;
 
     let tag = Tag::from(&path);
     let script = read_file(&path)?;
@@ -28,15 +28,15 @@ pub fn attach(api: ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>)
         print_info!("added:", "{path:?} as a script to {object}");
     }
 
-    let mut save_state = Save::read_save(&api)?;
+    let mut save_state = Save::read_save(api)?;
     let new_save_state = save_state.add_objects(&objects)?;
 
-    update_save(&api, new_save_state)?;
+    update_save(api, new_save_state)?;
     Ok(())
 }
 
-pub fn detach(api: ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(&api, guids, "Select the object to detach the script from:")?;
+pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()> {
+    let mut objects = get_objects(api, guids, "Select the object to detach the script from:")?;
 
     // Remove tags and script from objects
     for mut object in &mut objects {
@@ -45,16 +45,16 @@ pub fn detach(api: ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()> 
         object.lua_script = String::new();
     }
 
-    let mut save_state = Save::read_save(&api)?;
+    let mut save_state = Save::read_save(api)?;
     let new_save_state = save_state.add_objects(&objects)?;
 
-    update_save(&api, new_save_state)?;
+    update_save(api, new_save_state)?;
     Ok(())
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: ExternalEditorApi, path: PathBuf) -> Result<()> {
-    let mut save_state = Save::read_save(&api)?;
+pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
+    let mut save_state = Save::read_save(api)?;
 
     // Update the lua script with the file content from the tag
     // Returns Error if the object has multiple valid tags
@@ -70,7 +70,7 @@ pub fn reload(api: ExternalEditorApi, path: PathBuf) -> Result<()> {
     save_state.lua_script = get_global_script(&path, &save_state)?;
     save_state.xml_ui = get_global_ui(&path, &save_state)?;
 
-    update_save(&api, &save_state)?;
+    update_save(api, &save_state)?;
     Ok(())
 }
 
@@ -91,7 +91,7 @@ pub fn console(api: ExternalEditorApi, watch: Option<PathBuf>) -> Result<()> {
 }
 
 /// Backup current save as file
-pub fn backup(api: ExternalEditorApi, mut path: PathBuf) -> Result<()> {
+pub fn backup(api: &ExternalEditorApi, mut path: PathBuf) -> Result<()> {
     let save_path = api.get_scripts()?.save_path;
     path.set_extension("json");
     fs::copy(&save_path, &path)?;
