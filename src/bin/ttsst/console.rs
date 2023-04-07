@@ -18,8 +18,9 @@ pub fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
             let buffer = api.read_string();
             match serde_json::from_str(&buffer)? {
                 Answer::AnswerPrint(answer) => println!("{}", answer.message.b_grey()),
-                Answer::AnswerReload(_answer) => println!("{}", "Loading complete.".green()),
                 Answer::AnswerError(answer) => println!("{}", answer.error_message_prefix.red()),
+                // `MessageGetScripts` returns `AnswerReload` causing multiple prints
+                // Answer::AnswerReload(_answer) => println!("{}", "Loading complete.".green()),
                 _ => {}
             }
 
