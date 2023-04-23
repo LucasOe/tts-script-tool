@@ -29,7 +29,7 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>
 
     // Add objects to a new save state
     let mut save_state = Save::read_save(api)?;
-    save_state.object_states.add_objects(&objects)?;
+    save_state.objects.add_objects(&objects)?;
 
     update_save(api, &save_state)?;
     Ok(())
@@ -47,7 +47,7 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()>
 
     // Add objects to a new save state
     let mut save_state = Save::read_save(api)?;
-    save_state.object_states.add_objects(&objects)?;
+    save_state.objects.add_objects(&objects)?;
 
     update_save(api, &save_state)?;
     Ok(())
@@ -59,7 +59,7 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 
     // Update the lua script with the file content from the tag
     // Returns Error if the object has multiple valid tags
-    for mut object in save_state.object_states.iter_mut() {
+    for mut object in save_state.objects.iter_mut() {
         if let Some(tag) = object.tags.clone().valid()? {
             if (path.is_file() && tag.is_path(&path)) || path.is_dir() {
                 object.lua_script = tag.read_file(&path)?;
@@ -110,13 +110,13 @@ fn get_objects(
 fn validate_guids(save: Save, guids: Vec<String>) -> Result<Vec<Object>> {
     guids
         .into_iter()
-        .map(|guid| save.object_states.clone().find_object(&guid))
+        .map(|guid| save.objects.clone().find_object(&guid))
         .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
 }
 
 /// Shows a multi selection prompt of objects loaded in the current save
 fn select_objects(save: Save, message: &str) -> Result<Vec<Object>> {
-    let objects = save.object_states;
+    let objects = save.objects;
     MultiSelect::new(message, objects.into_inner())
         .prompt()
         .map_err(Error::InquireError)
@@ -130,7 +130,7 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
 
     // Map every `Object` in the `save` to `serde_json::Value`
     let mut objects = save
-        .object_states
+        .objects
         .iter()
         .map(|object| object.to_value())
         .collect::<Vec<Value>>();
