@@ -4,7 +4,7 @@ use std::{collections::HashMap, path::PathBuf};
 use std::{fs, io};
 
 use crate::error::{Error, Result};
-use crate::tags::Tags;
+use crate::objects::Objects;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tts_external_api::ExternalEditorApi;
@@ -19,7 +19,7 @@ pub struct Save {
     #[serde(rename = "XmlUI", default)]
     pub xml_ui: String,
     #[serde(rename = "ObjectStates")]
-    pub object_states: Vec<Object>,
+    pub object_states: Objects,
 
     // Other fields that are not relevant
     #[serde(flatten)]
@@ -46,77 +46,5 @@ impl Save {
         serde_json::to_writer_pretty(writer, self).map_err(Error::SerdeError)?;
 
         Ok(self) // Return Self for method chaining
-    }
-
-    /// Adds the objects to the existing objects in this `Save`.
-    /// Objects with the same guid will be replaced.
-    pub fn add_objects(&mut self, objects: &[Object]) -> Result<&Self> {
-        for object_state in &mut self.object_states {
-            if let Some(object) = objects.iter().find(|object| object == &object_state) {
-                *object_state = object.clone();
-            };
-        }
-
-        Ok(self) // Return Self for method chaining
-    }
-
-    pub fn find_object(self, guid: &String) -> Result<Object> {
-        self.object_states
-            .into_iter()
-            .find(|object| object.has_guid(guid))
-            .ok_or("{guid} does not exist".into())
-    }
-}
-
-/// An object loaded in the current save or savestate.
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Object {
-    #[serde(rename = "GUID")]
-    pub guid: String,
-    #[serde(rename = "Name")]
-    pub name: String,
-    #[serde(rename = "Nickname", default)]
-    pub nickname: String,
-    #[serde(rename = "Tags", default)]
-    pub tags: Tags,
-    #[serde(rename = "LuaScript", default)]
-    pub lua_script: String,
-    #[serde(rename = "XmlUI", default)]
-    pub xml_ui: String,
-
-    // Other fields that are not relevant
-    #[serde(flatten)]
-    extra: HashMap<String, Value>,
-}
-
-impl std::fmt::Display for Object {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match (self.nickname.is_empty(), self.name.is_empty()) {
-            (true, true) => write!(f, "'{}'", self.guid),
-            (true, false) => write!(f, "'{}' ({})", self.guid, self.name),
-            _ => write!(f, "'{}' ({})", self.guid, self.nickname),
-        }
-    }
-}
-
-impl PartialEq for Object {
-    fn eq(&self, other: &Self) -> bool {
-        self.guid == other.guid
-    }
-}
-
-impl Object {
-    /// Return `true` if the object has the same guid
-    pub fn has_guid(&self, guid: &String) -> bool {
-        &self.guid == guid
-    }
-
-    /// Create a Value used for the [`reload!`] macro.
-    pub fn to_value(&self) -> Value {
-        serde_json::json!({
-            "guid": self.guid,
-            "script": self.lua_script,
-            "ui": self.xml_ui,
-        })
     }
 }
