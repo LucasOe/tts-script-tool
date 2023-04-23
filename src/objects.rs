@@ -9,6 +9,12 @@ use serde_json::Value;
 #[derive(Deserialize, Serialize, Default, Clone, Debug, IntoIterator, Deref, DerefMut)]
 pub struct Objects(Vec<Object>);
 
+impl FromIterator<Object> for Objects {
+    fn from_iter<I: IntoIterator<Item = Object>>(iter: I) -> Self {
+        Objects(iter.into_iter().collect::<Vec<Object>>())
+    }
+}
+
 impl Objects {
     /// Consumes `Objects`, returning the wrapped value.
     pub fn into_inner(self) -> Vec<Object> {
@@ -29,8 +35,7 @@ impl Objects {
 
     /// Searches for an object that has the same guid
     pub fn find_object(self, guid: &String) -> Result<Object> {
-        self.0
-            .into_iter()
+        self.into_iter()
             .find(|object| object.has_guid(guid))
             .ok_or("{guid} does not exist".into())
     }

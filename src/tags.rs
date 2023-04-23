@@ -8,6 +8,12 @@ use std::path::Path;
 #[derive(Deserialize, Serialize, Default, Clone, Debug, IntoIterator, Deref, DerefMut)]
 pub struct Tags(Vec<Tag>);
 
+impl FromIterator<Tag> for Tags {
+    fn from_iter<I: IntoIterator<Item = Tag>>(iter: I) -> Self {
+        Tags(iter.into_iter().collect::<Vec<Tag>>())
+    }
+}
+
 impl Tags {
     /// Consumes `Tags`, returning the wrapped value.
     pub fn into_inner(self) -> Vec<Tag> {
@@ -15,30 +21,22 @@ impl Tags {
     }
 
     /// Tags that follow the naming convention defined in [`Tag::is_valid()`] are valid
-    pub fn filter_valid(self) -> Self {
-        Self(
-            self.into_iter()
-                .filter(|tag| tag.is_valid())
-                .collect::<Vec<Tag>>(),
-        )
+    pub fn filter_valid(&self) -> Self {
+        self.iter().filter(|tag| tag.is_valid()).cloned().collect()
     }
 
     /// Tags that don't follow the naming convention defined in [`Tag::is_valid()`] are invalid
-    pub fn filter_invalid(self) -> Self {
-        Self(
-            self.into_iter()
-                .filter(|tag| !tag.is_valid())
-                .collect::<Vec<Tag>>(),
-        )
+    pub fn filter_invalid(&self) -> Self {
+        self.iter().filter(|tag| !tag.is_valid()).cloned().collect()
     }
 
     /// Returns a valid [`Tag`], if the list only contains a single valid tag.
     /// If it contains no valid Tags it returns [`None`].
     /// If the list contains multiple valid tags, this function returns an [`Error::Msg`].
-    pub fn valid(self) -> Result<Option<Tag>> {
+    pub fn valid(&self) -> Result<Option<Tag>> {
         let valid = self.filter_valid();
-        match valid.0.len() {
-            1 => Ok(valid.0.get(0).cloned()),
+        match valid.len() {
+            1 => Ok(valid.get(0).cloned()),
             0 => Ok(None),
             _ => Err("{guid} has multiple valid script tags: {tags}".into()),
         }

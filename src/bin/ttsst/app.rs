@@ -21,9 +21,8 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>
     let script = read_file(&path)?;
     // Add tag and script to objects
     for object in objects.iter_mut() {
-        let mut new_tags = object.tags.clone().filter_invalid();
-        new_tags.push(tag.clone());
-        object.tags = new_tags;
+        object.tags = object.tags.filter_invalid();
+        object.tags.push(tag.clone());
         print_info!("added:", "'{tag}' as a tag to {object}");
 
         object.lua_script = script.clone();
@@ -43,8 +42,7 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()>
 
     // Remove tags and script from objects
     for object in objects.iter_mut() {
-        let new_tags = object.tags.clone().filter_invalid();
-        object.tags = new_tags;
+        object.tags = object.tags.filter_invalid();
         object.lua_script = String::new();
     }
 
@@ -63,7 +61,7 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
     // Update the lua script with the file content from the tag
     // Returns Error if the object has multiple valid tags
     for object in save_state.objects.iter_mut() {
-        if let Some(tag) = object.tags.clone().valid()? {
+        if let Some(tag) = object.tags.valid()? {
             if (path.is_file() && tag.is_path(&path)) || path.is_dir() {
                 object.lua_script = tag.read_file(&path)?;
                 print_info!("updated:", "{object} with tag '{tag}'");
