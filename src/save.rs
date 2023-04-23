@@ -13,13 +13,13 @@ use tts_external_api::ExternalEditorApi;
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Save {
     #[serde(rename = "SaveName")]
-    pub save_name: String,
+    pub name: String,
     #[serde(rename = "LuaScript", default)]
     pub lua_script: String,
     #[serde(rename = "XmlUI", default)]
     pub xml_ui: String,
     #[serde(rename = "ObjectStates")]
-    pub object_states: Objects,
+    pub objects: Objects,
 
     // Other fields that are not relevant
     #[serde(flatten)]
