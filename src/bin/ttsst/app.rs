@@ -9,15 +9,18 @@ use ttsst::error::{Error, Result};
 use ttsst::reload;
 use ttsst::{Object, Save, Tag};
 
+const ATTACH_MESSAGE: &str = "Select the object to attach the script to:";
+const DETACH_MESSAGE: &str = "Select the object to detach the script from:";
+
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
 pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(api, guids, "Select the object to attach the script to:")?;
+    let mut objects = get_objects(api, guids, ATTACH_MESSAGE)?;
 
     let tag = Tag::from(&path);
     let script = read_file(&path)?;
     // Add tag and script to objects
-    for mut object in &mut objects {
+    for object in objects.iter_mut() {
         let mut new_tags = object.tags.clone().filter_invalid();
         new_tags.push(tag.clone());
         object.tags = new_tags;
@@ -36,10 +39,10 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>
 }
 
 pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(api, guids, "Select the object to detach the script from:")?;
+    let mut objects = get_objects(api, guids, DETACH_MESSAGE)?;
 
     // Remove tags and script from objects
-    for mut object in &mut objects {
+    for object in objects.iter_mut() {
         let new_tags = object.tags.clone().filter_invalid();
         object.tags = new_tags;
         object.lua_script = String::new();
@@ -59,7 +62,7 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 
     // Update the lua script with the file content from the tag
     // Returns Error if the object has multiple valid tags
-    for mut object in save_state.objects.iter_mut() {
+    for object in save_state.objects.iter_mut() {
         if let Some(tag) = object.tags.clone().valid()? {
             if (path.is_file() && tag.is_path(&path)) || path.is_dir() {
                 object.lua_script = tag.read_file(&path)?;
