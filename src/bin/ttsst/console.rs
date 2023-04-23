@@ -5,7 +5,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use colorize::AnsiColor;
-use notify_debouncer_mini::{self as debouncer, notify::*};
+use notify_debouncer_mini::{self as debouncer, notify::RecursiveMode};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;

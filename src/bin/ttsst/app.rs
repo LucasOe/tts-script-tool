@@ -97,25 +97,28 @@ fn get_objects(
     guids: Option<Vec<String>>,
     message: &str,
 ) -> Result<Vec<Object>> {
-    let save_state = Save::read_save(api)?;
-
+    let save = Save::read_save(api)?;
     match guids {
-        Some(guids) => {
-            // Once an `Result::Err` is found, the iteration will terminate and return the result.
-            // If `guids` only contains existing objects, a vec with the savestate of those objects will be returned.
-            guids
-                .into_iter()
-                .map(|guid| save_state.clone().find_object(&guid))
-                .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
-        }
-        None => {
-            let objects = save_state.object_states;
-            // Shows a multi selection prompt
-            MultiSelect::new(message, objects)
-                .prompt()
-                .map_err(Error::InquireError)
-        }
+        Some(guids) => validate_guids(save, guids),
+        None => select_objects(save, message),
     }
+}
+
+/// Once an `Result::Err` is found, the iteration will terminate and return the result.
+/// If `guids` only contains existing objects, a vec with the savestate of those objects will be returned.
+fn validate_guids(save: Save, guids: Vec<String>) -> Result<Vec<Object>> {
+    guids
+        .into_iter()
+        .map(|guid| save.clone().find_object(&guid))
+        .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
+}
+
+/// Shows a multi selection prompt of objects loaded in the current save
+fn select_objects(save: Save, message: &str) -> Result<Vec<Object>> {
+    let objects = save.object_states;
+    MultiSelect::new(message, objects)
+        .prompt()
+        .map_err(Error::InquireError)
 }
 
 /// Overwrite the save file and reload the current save,
@@ -124,7 +127,7 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
     // Overwrite the save file with the modified objects
     save.write_save(api)?;
 
-    // Map `Object` to `serde_json::Value`
+    // Map every `Object` in the `save` to `serde_json::Value`
     let mut objects = save
         .object_states
         .iter()
