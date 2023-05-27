@@ -30,10 +30,10 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>
     }
 
     // Add objects to a new save state
-    let mut save_state = Save::read_save(api)?;
-    save_state.objects.add_objects(&objects)?;
+    let mut save = Save::read_save(api)?;
+    save.objects.add_objects(&objects)?;
 
-    update_save(api, &save_state)?;
+    update_save(api, &save)?;
     Ok(())
 }
 
@@ -47,20 +47,20 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()>
     }
 
     // Add objects to a new save state
-    let mut save_state = Save::read_save(api)?;
-    save_state.objects.add_objects(&objects)?;
+    let mut save = Save::read_save(api)?;
+    save.objects.add_objects(&objects)?;
 
-    update_save(api, &save_state)?;
+    update_save(api, &save)?;
     Ok(())
 }
 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
-    let mut save_state = Save::read_save(api)?;
+    let mut save = Save::read_save(api)?;
 
     // Update the lua script with the file content from the tag
     // Returns Error if the object has multiple valid tags
-    for object in save_state.objects.iter_mut() {
+    for object in save.objects.iter_mut() {
         if let Some(tag) = object.tags.valid()? {
             if (path.is_file() && tag.is_path(&path)) || path.is_dir() {
                 object.lua_script = tag.read_file(&path)?;
@@ -69,12 +69,12 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
         }
     }
 
-    // Get global script and ui from the files provided on the path.
-    // If no files exist, fallback to the save state from the current save.
-    save_state.lua_script = get_global_script(&path, &save_state)?;
-    save_state.xml_ui = get_global_ui(&path, &save_state)?;
+    save.lua_script = read_global_files(&path, &["Global.lua", "Global.ttslua"])? // Update lua
+        .unwrap_or(save.lua_script); // Fallback to the existing lua script
+    save.xml_ui = read_global_files(&path, &["Global.xml"])? // Update xml
+        .unwrap_or(save.xml_ui); // Fallback to the existing xml ui
 
-    update_save(api, &save_state)?;
+    update_save(api, &save)?;
     Ok(())
 }
 
@@ -130,11 +130,11 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
     save.write_save(api)?;
 
     // Map every `Object` in the `save` to `serde_json::Value`
-    let mut objects = save
+    let mut objects: Vec<Value> = save
         .objects
         .iter()
         .map(|object| object.to_value())
-        .collect::<Vec<Value>>();
+        .collect();
 
     // Add global script and ui to `objects`
     objects.push(json!({
@@ -148,27 +148,23 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
     Ok(())
 }
 
-/// Get a global script from a file or fallback to the save state from the current save if no file exists.
-/// Returns [`Error::Msg`] if both "Global.ttslua" and "Global.lua" exist.
-/// If the file exists but can't be read it returns [`Error::Io`].
-fn get_global_script(path: &Path, save_state: &Save) -> Result<String> {
-    let global_tts = Path::new(path).join("./Global.ttslua");
-    let global_lua = Path::new(path).join("./Global.lua");
-    match (global_tts.exists(), global_lua.exists()) {
-        (true, true) => Err("Global.ttslua and Global.lua both exist on the provided path".into()),
-        (true, false) => read_file(&global_tts),
-        (false, true) => read_file(&global_lua),
-        (false, false) => Ok(save_state.lua_script.clone()),
-    }
+/// Join path and files and filter by existing paths
+fn get_existing_paths(path: &Path, files: &[&str]) -> Vec<PathBuf> {
+    files
+        .iter()
+        .map(|file| Path::new(path).join(file)) // concat path and file name
+        .filter(|path| path.exists()) // filter by existing paths
+        .collect()
 }
 
-/// Get a global ui from a file or fallback to the save state from the current save if no file exists.
-/// If the file exists but can't be read it returns [`Error::Io`].
-fn get_global_ui(path: &Path, save_state: &Save) -> Result<String> {
-    let global_xml = Path::new(path).join("./Global.xml");
-    match global_xml.exists() {
-        true => read_file(&global_xml),
-        false => Ok(save_state.xml_ui.clone()),
+/// Reads a file from a list of possible file names. Only one of the files can exist on the path, otherwise this
+/// function returns an [`Error::Msg`]. If none of the files provided exist `Ok(None)` gets returned.
+fn read_global_files(path: &Path, files: &[&str]) -> Result<Option<String>> {
+    let paths = get_existing_paths(path, files);
+    match paths.len() {
+        1 => read_file(&paths[0]).map(Option::Some),
+        0 => Ok(None),
+        _ => Err(format!("multiple global files exist on the provided path: {paths:?}").into()),
     }
 }
 
