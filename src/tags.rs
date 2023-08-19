@@ -1,7 +1,7 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// A list of [`Tags`](Tag) associated with an [`Object`](crate::objects::Object).
 /// Tags can be filtered by valid an invalid tags.
@@ -65,19 +65,23 @@ impl Tag {
         exprs.is_match(&self.0)
     }
 
-    /// Reads the file from the tag and returns the content, if the tag is valid.
-    pub fn read_file(&self, path: &Path) -> Result<String> {
-        if self.is_valid() {
-            let file_name = Path::new(&self.0).file_name().unwrap();
-            let path_dir = match path.is_file() {
-                true => path.parent().unwrap(),
-                false => path,
-            };
-            let file_path = String::from(path_dir.join(file_name).to_string_lossy());
-            std::fs::read_to_string(file_path).map_err(Error::Io)
-        } else {
-            Err("Invalid Tag: {self}".into())
+    /// Joins the [`Tag`] and the path provided as an argument into a full path.
+    ///
+    /// `scripts/<File>.ttslua` and `./src` would result in `./src/<File>.ttslua`.
+    pub fn join_path(&self, path: &Path) -> Result<PathBuf> {
+        if !self.is_valid() {
+            return Err("Invalid Tag: {self}".into());
         }
+
+        // Use the parent directory if a file path is provided as an input
+        let path_dir = match path.is_file() {
+            true => path.parent().unwrap(),
+            false => path,
+        };
+        // Only use the file name from the [`Tag`]
+        let file_name = Path::new(&self.0).file_name().unwrap();
+
+        Ok(path_dir.join(file_name))
     }
 
     /// Returns true if the tag equals the path
