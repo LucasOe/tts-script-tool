@@ -39,6 +39,18 @@ impl Objects {
             .find(|object| object.has_guid(guid))
             .ok_or("{guid} does not exist".into())
     }
+
+    /// Filter out `HandTrigger`, `FogOfWar` and `FogOfWarTrigger` objects
+    ///
+    /// For a list of object names see:
+    /// https://kb.tabletopsimulator.com/custom-content/save-file-format/#object-name-list
+    pub fn filter_hidden(self) -> Self {
+        const HIDDEN: &[&str] = &["HandTrigger", "FogOfWar", "FogOfWarTrigger"];
+
+        self.into_iter()
+            .filter(|object| !HIDDEN.contains(&object.name.as_str()))
+            .collect()
+    }
 }
 
 /// An object loaded in the current save or savestate.

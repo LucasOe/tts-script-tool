@@ -26,6 +26,10 @@ enum Commands {
         /// Optional: The guid(s) of the object(s) the script should be attached to
         #[arg(value_parser)]
         guids: Option<Vec<String>>,
+
+        /// Show HandTriggers in the list of objects, if no guids are provided
+        #[arg(short, long)]
+        all: bool,
     },
 
     /// Detach a script from one or more objects
@@ -33,6 +37,10 @@ enum Commands {
         /// Optional: The guid(s) of the object(s) the script should be detached from
         #[arg(value_parser)]
         guids: Option<Vec<String>>,
+
+        /// Show HandTriggers in the list of objects, if no guids are provided
+        #[arg(short, long)]
+        all: bool,
     },
 
     /// Update scripts and reload save
@@ -69,8 +77,8 @@ fn main() {
 fn run(args: Args) -> Result<()> {
     let api = ExternalEditorApi::new();
     match args.command {
-        Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
-        Commands::Detach { guids } => app::detach(&api, guids)?,
+        Commands::Attach { path, guids, all } => app::attach(&api, path, guids, all)?,
+        Commands::Detach { guids, all } => app::detach(&api, guids, all)?,
         Commands::Backup { path } => app::backup(&api, path)?,
         Commands::Console { watch } => console::start(api, watch)?,
         Commands::Reload { path } => app::reload(&api, path)?,

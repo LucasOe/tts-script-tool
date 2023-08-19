@@ -14,8 +14,13 @@ const DETACH_MESSAGE: &str = "Select the object to detach the script from:";
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
-pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(api, guids, ATTACH_MESSAGE)?;
+pub fn attach(
+    api: &ExternalEditorApi,
+    path: PathBuf,
+    guids: Option<Vec<String>>,
+    show_all: bool,
+) -> Result<()> {
+    let mut objects = get_objects(api, guids, show_all, ATTACH_MESSAGE)?;
 
     let tag = Tag::from(&path);
     let script = read_file(&path)?;
@@ -37,8 +42,8 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Option<Vec<String>>
     Ok(())
 }
 
-pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>) -> Result<()> {
-    let mut objects = get_objects(api, guids, DETACH_MESSAGE)?;
+pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>, show_all: bool) -> Result<()> {
+    let mut objects = get_objects(api, guids, show_all, DETACH_MESSAGE)?;
 
     // Remove tags and script from objects
     for object in objects.iter_mut() {
@@ -97,12 +102,13 @@ pub fn backup(api: &ExternalEditorApi, mut path: PathBuf) -> Result<()> {
 fn get_objects(
     api: &ExternalEditorApi,
     guids: Option<Vec<String>>,
+    show_all: bool,
     message: &str,
 ) -> Result<Vec<Object>> {
     let save = Save::read_save(api)?;
     match guids {
         Some(guids) => validate_guids(save, guids),
-        None => select_objects(save, message),
+        None => select_objects(save, message, show_all),
     }
 }
 
@@ -116,8 +122,11 @@ fn validate_guids(save: Save, guids: Vec<String>) -> Result<Vec<Object>> {
 }
 
 /// Shows a multi selection prompt of objects loaded in the current save
-fn select_objects(save: Save, message: &str) -> Result<Vec<Object>> {
-    let objects = save.objects;
+fn select_objects(save: Save, message: &str, show_all: bool) -> Result<Vec<Object>> {
+    let objects = match show_all {
+        true => save.objects,
+        false => save.objects.filter_hidden(),
+    };
     MultiSelect::new(message, objects.into_inner())
         .prompt()
         .map_err(Error::InquireError)
