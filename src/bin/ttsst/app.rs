@@ -6,7 +6,6 @@ use inquire::MultiSelect;
 use serde_json::{json, Value};
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::{Error, Result};
-use ttsst::reload;
 use ttsst::{Object, Save, Tag};
 
 const ATTACH_MESSAGE: &str = "Select the object to attach the script to:";
@@ -152,7 +151,7 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
         "ui": save.xml_ui
     }));
 
-    reload!(api, objects)?;
+    api.reload(serde_json::json!(objects))?;
     print_info!("reloaded save!");
     Ok(())
 }
