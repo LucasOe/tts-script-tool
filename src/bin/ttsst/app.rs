@@ -67,7 +67,7 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
     for object in save.objects.iter_mut() {
         if let Some(tag) = object.tags.valid()? {
             if (path.is_file() && tag.is_path(&path)) || path.is_dir() {
-                object.lua_script = tag.read_file(&path)?;
+                object.lua_script = read_file(&tag.join_path(&path)?)?;
                 print_info!("updated:", "{object} with tag '{tag}'");
             }
         }
