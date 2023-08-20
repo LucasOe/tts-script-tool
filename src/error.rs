@@ -10,8 +10,6 @@ pub enum Error {
     SerdeError(#[from] serde_json::Error),
     #[error(transparent)]
     NotifyError(#[from] notify_debouncer_mini::notify::Error),
-    #[error("Error reading from file")]
-    ReadFile,
     #[error("{0}")]
     Msg(String),
 }
