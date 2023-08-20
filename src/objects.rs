@@ -9,6 +9,12 @@ use serde_json::Value;
 #[derive(Deserialize, Serialize, Default, Clone, Debug, IntoIterator, Deref, DerefMut)]
 pub struct Objects(Vec<Object>);
 
+impl From<Vec<Object>> for Objects {
+    fn from(vec: Vec<Object>) -> Self {
+        Objects(vec)
+    }
+}
+
 impl FromIterator<Object> for Objects {
     fn from_iter<I: IntoIterator<Item = Object>>(iter: I) -> Self {
         Objects(iter.into_iter().collect::<Vec<Object>>())
@@ -21,35 +27,37 @@ impl Objects {
         self.0
     }
 
-    /// Adds the objects to the existing objects in this `Save`.
-    /// Objects with the same guid will be replaced.
-    pub fn add_objects(&mut self, objects: &[Object]) -> Result<&Self> {
+    /// Replace all the objects in `self` with `other`, where their guid matches.
+    pub fn replace(&mut self, other: &mut [Object]) {
         for object_state in &mut self.0 {
-            if let Some(object) = objects.iter().find(|object| object == &object_state) {
+            if let Some(object) = other.iter().find(|object| object.guid == object_state.guid) {
                 *object_state = object.clone();
             };
         }
-
-        Ok(self) // Return Self for method chaining
     }
 
-    /// Searches for an object that has the same guid
+    /// Searches for an object that has the same guid.
     pub fn find_object(self, guid: &String) -> Result<Object> {
         self.into_iter()
-            .find(|object| object.has_guid(guid))
+            .find(|object| &object.guid == guid)
             .ok_or("{guid} does not exist".into())
     }
 
-    /// Filter out `HandTrigger`, `FogOfWar` and `FogOfWarTrigger` objects
+    /// Filter out `HandTrigger`, `FogOfWar` and `FogOfWarTrigger` objects.
     ///
     /// For a list of object names see:
     /// https://kb.tabletopsimulator.com/custom-content/save-file-format/#object-name-list
     pub fn filter_hidden(self) -> Self {
         const HIDDEN: &[&str] = &["HandTrigger", "FogOfWar", "FogOfWarTrigger"];
-
         self.into_iter()
             .filter(|object| !HIDDEN.contains(&object.name.as_str()))
             .collect()
+    }
+
+    /// Construct a vec of [`serde_json::Value`] from `self`.
+    /// The value only includes the `guid`, `lau_script` and `xml_ui`.
+    pub fn to_values(&self) -> Vec<Value> {
+        self.iter().map(|object| object.to_value()).collect()
     }
 }
 
@@ -84,19 +92,9 @@ impl std::fmt::Display for Object {
     }
 }
 
-impl PartialEq for Object {
-    fn eq(&self, other: &Self) -> bool {
-        self.guid == other.guid
-    }
-}
-
 impl Object {
-    /// Return `true` if the object has the same guid
-    pub fn has_guid(&self, guid: &String) -> bool {
-        &self.guid == guid
-    }
-
-    /// Create a Value used for the [`reload!`] macro.
+    /// Construct a [`serde_json::Value`] from `self`.
+    /// The value only includes the `guid`, `lau_script` and `xml_ui`.
     pub fn to_value(&self) -> Value {
         serde_json::json!({
             "guid": self.guid,
