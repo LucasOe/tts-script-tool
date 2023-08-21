@@ -25,14 +25,12 @@ pub fn attach(
     for object in objects.iter_mut() {
         object.tags.retain(|tag| !tag.is_valid());
         object.tags.push(tag.clone());
-        print_info!("added:", "'{tag}' as a tag to {object}");
-
         object.lua_script = script.clone();
         print_info!("added:", "{path:?} as a script to {object}");
     }
 
     // Add objects to a new save state
-    let mut save = Save::read_save(api)?;
+    let mut save = Save::read(api)?;
     save.objects.replace(&mut objects);
 
     update_save(api, &save)?;
@@ -49,7 +47,7 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>, show_all: boo
     }
 
     // Add objects to a new save state
-    let mut save = Save::read_save(api)?;
+    let mut save = Save::read(api)?;
     save.objects.replace(&mut objects);
 
     update_save(api, &save)?;
@@ -58,7 +56,7 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>, show_all: boo
 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
-    let mut save = Save::read_save(api)?;
+    let mut save = Save::read(api)?;
 
     // Update the lua script with the file content from the tag
     // Returns Error if the object has multiple valid tags
@@ -98,7 +96,7 @@ fn get_objects(
     show_all: bool,
     message: &str,
 ) -> Result<Objects> {
-    let save = Save::read_save(api)?;
+    let save = Save::read(api)?;
     match guids {
         Some(guids) => validate_guids(save, guids),
         None => select_objects(save, message, show_all),
@@ -131,7 +129,7 @@ fn select_objects(save: Save, message: &str, show_all: bool) -> Result<Objects> 
 /// the same way it get reloaded when pressing “Save & Play” within the in-game editor.
 fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
     // Overwrite the save file with the modified objects
-    save.write_save(api)?;
+    save.write(api)?;
 
     // Add global lua_script and xml_ui to save
     let mut objects = save.objects.to_values();
@@ -149,7 +147,9 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
 
 /// Set the lua script of the save to either `Global.lua` or `Global.ttslua`, if one of them exists in the `path` directory.
 /// Set the xml ui of the save to `Global.xml`, if it exists in the `path` directory.
-/// Returns an error if multiple files exist in the `path` directory.
+///
+/// If the file is empty, this function will use a placeholder text to avoid writing an empty string.
+/// See [`Save::write`].
 fn update_global(save: &mut Save, path: &Path) -> Result<()> {
     const GLOBAL_LUA: &[&str] = &["Global.lua", "Global.ttslua"];
     const GLOBAL_XML: &[&str] = &["Global.xml"];
