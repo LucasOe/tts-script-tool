@@ -133,12 +133,12 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
     // Overwrite the save file with the modified objects
     save.write_save(api)?;
 
-    // Add global script and ui to save
+    // Add global lua_script and xml_ui to save
     let mut objects = save.objects.to_values();
     objects.push(serde_json::json!({
         "guid": "-1",
         "script": save.lua_script,
-        "ui": save.xml_ui
+        "ui": save.xml_ui,
     }));
 
     // Reload save
@@ -154,11 +154,24 @@ fn update_global(save: &mut Save, path: &Path) -> Result<()> {
     const GLOBAL_LUA: &[&str] = &["Global.lua", "Global.ttslua"];
     const GLOBAL_XML: &[&str] = &["Global.xml"];
 
+    // Update lua_script
     if let Some(path) = get_global_path(path, GLOBAL_LUA)? {
-        save.lua_script = read_file(&path)?;
+        let file = read_file(&path)?;
+        save.lua_script = match file.is_empty() {
+            #[rustfmt::skip]
+            true => "--[[ Lua code. See documentation: https://api.tabletopsimulator.com/ --]]".to_string(),
+            false => file,
+        };
     };
+
+    // Update xml_ui
     if let Some(path) = get_global_path(path, GLOBAL_XML)? {
-        save.xml_ui = read_file(&path)?;
+        let file: String = read_file(&path)?;
+        save.xml_ui = match file.is_empty() {
+            #[rustfmt::skip]
+            true => "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->".to_string(),
+            false => file,
+        };
     };
 
     Ok(())

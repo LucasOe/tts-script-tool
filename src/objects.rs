@@ -66,16 +66,16 @@ impl Objects {
 pub struct Object {
     #[serde(rename = "GUID")]
     pub guid: String,
-    #[serde(rename = "Name")]
+    #[serde(rename = "LuaScript", default)]
+    pub lua_script: String,
+    #[serde(rename = "XmlUI", default)]
+    pub xml_ui: String,
+    #[serde(rename = "Name", default)]
     pub name: String,
     #[serde(rename = "Nickname", default)]
     pub nickname: String,
     #[serde(rename = "Tags", default)]
     pub tags: Tags,
-    #[serde(rename = "LuaScript", default)]
-    pub lua_script: String,
-    #[serde(rename = "XmlUI", default)]
-    pub xml_ui: String,
 
     // Other fields that are not relevant
     #[serde(flatten)]
