@@ -1,15 +1,13 @@
-//! Struct definitions for the Tabletop Simulator [Save File Format](https://kb.tabletopsimulator.com/custom-content/save-file-format/).
-
 use std::{collections::HashMap, path::PathBuf};
 use std::{fs, io};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::objects::Objects;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tts_external_api::ExternalEditorApi;
 
-/// Holds a state of the game
+/// A representation of the Tabletop Simulator [Save File Format](https://kb.tabletopsimulator.com/custom-content/save-file-format/).
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Save {
     #[serde(rename = "SaveName")]
@@ -21,30 +19,30 @@ pub struct Save {
     #[serde(rename = "ObjectStates")]
     pub objects: Objects,
 
-    // Other fields that are not relevant
+    // Other fields
     #[serde(flatten)]
     extra: HashMap<String, Value>,
 }
 
 impl Save {
     /// Reads the currently open save file and returns it as a `Save`.
-    pub fn read_save(api: &ExternalEditorApi) -> Result<Self> {
-        let path = PathBuf::from(api.get_scripts()?.save_path);
-        let file = fs::File::open(path)?;
+    pub fn read(api: &ExternalEditorApi) -> Result<Self> {
+        let save_path = PathBuf::from(api.get_scripts()?.save_path);
+        let file = fs::File::open(save_path)?;
         let reader = io::BufReader::new(file);
 
-        serde_json::from_reader(reader).map_err(Error::SerdeError)
+        serde_json::from_reader(reader).map_err(|err| err.into())
     }
 
-    /// Writes this `Save` to the currently open save file.
-    pub fn write_save(&self, api: &ExternalEditorApi) -> Result<&Self> {
-        let path = PathBuf::from(api.get_scripts()?.save_path);
-        //let path = std::path::Path::new("./out.json");
-        let file = fs::File::create(path)?;
+    /// Writes `self` to the save file that is currently loaded ingame.
+    ///
+    /// If `self` contains an empty `lua_script` or `xml_ui` string,
+    /// the function will cause a connection error.
+    pub fn write(&self, api: &ExternalEditorApi) -> Result<()> {
+        let save_path = PathBuf::from(api.get_scripts()?.save_path);
+        let file = fs::File::create(save_path)?;
         let writer = io::BufWriter::new(file);
 
-        serde_json::to_writer_pretty(writer, self).map_err(Error::SerdeError)?;
-
-        Ok(self) // Return Self for method chaining
+        serde_json::to_writer_pretty(writer, self).map_err(|err| err.into())
     }
 }
