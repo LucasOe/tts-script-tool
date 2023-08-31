@@ -37,9 +37,9 @@ impl Objects {
     }
 
     /// Searches for an object that has the same guid.
-    pub fn find_object(self, guid: &String) -> Result<Object> {
+    pub fn find_object(self, guid: &str) -> Result<Object> {
         self.into_iter()
-            .find(|object| &object.guid == guid)
+            .find(|object| object.guid == guid)
             .ok_or("{guid} does not exist".into())
     }
 
