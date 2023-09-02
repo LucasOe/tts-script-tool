@@ -1,23 +1,27 @@
 mod app;
 mod console;
-mod macros;
 mod msg;
 mod parser;
 
 use clap::{Args, Parser, Subcommand};
-use colorize::AnsiColor;
+use log::*;
+use simplelog::{Color, ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use std::path::PathBuf;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    /// Verbosity level - specify up to 2 times to get more detailed output.
+    #[clap(short = 'v', long = "verbose", action = clap::ArgAction::Count, global = true)]
+    pub verbosity: u8,
 }
 
-#[derive(Args)]
+#[derive(Args, Debug)]
 pub struct Guids {
     /// Optional: The guid(s) of the object(s) the script should be attached to
     #[arg(value_parser = parser::guid)]
@@ -28,7 +32,7 @@ pub struct Guids {
     all: bool,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Commands {
     /// Attach a script to one or more objects
     Attach {
@@ -75,15 +79,37 @@ enum Commands {
 }
 
 fn main() {
-    let args = Cli::parse();
+    let cli = Cli::parse();
 
-    if let Err(err) = run(args) {
-        eprintln!("{} {}", "error:".red().bold(), err);
+    if let Err(err) = run(cli) {
+        error!("{}", err);
         std::process::exit(1);
     }
 }
 
+fn init_logger(verbosity: u8) -> Result<()> {
+    let log_level = match verbosity {
+        0 => LevelFilter::Info,
+        1 => LevelFilter::Debug,
+        _ => LevelFilter::Trace,
+    };
+
+    let config = simplelog::ConfigBuilder::new()
+        .set_time_level(LevelFilter::Off)
+        .set_level_color(Level::Error, Some(Color::Red))
+        .set_level_color(Level::Warn, Some(Color::Yellow))
+        .set_level_color(Level::Info, Some(Color::Green))
+        .set_level_color(Level::Debug, Some(Color::Blue))
+        .set_level_color(Level::Trace, Some(Color::Magenta))
+        .build();
+
+    TermLogger::init(log_level, config, TerminalMode::Mixed, ColorChoice::Auto)
+        .map_err(|err| err.into())
+}
+
 fn run(args: Cli) -> Result<()> {
+    init_logger(args.verbosity)?;
+
     let api = ExternalEditorApi::new();
     match args.command {
         Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
