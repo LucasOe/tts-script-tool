@@ -1,18 +1,15 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{print_info, Guids};
+use crate::{msg::Mode, print_info, Guids};
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 use ttsst::{Objects, Save, Tag};
 
-const ATTACH_MESSAGE: &str = "Select the object to attach the script to:";
-const DETACH_MESSAGE: &str = "Select the object to detach the script from:";
-
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
 pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Guids) -> Result<()> {
-    let mut objects = get_objects(api, guids, ATTACH_MESSAGE)?;
+    let mut objects = get_objects(api, guids, Mode::Attach)?;
 
     let tag = Tag::try_from(path.as_path())?;
     let file = read_file(&path)?;
@@ -42,7 +39,7 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Guids) -> Result<()
 }
 
 pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
-    let mut objects = get_objects(api, guids, DETACH_MESSAGE)?;
+    let mut objects = get_objects(api, guids, Mode::Detach)?;
 
     // Remove tags and script from objects
     for object in objects.iter_mut() {
@@ -110,11 +107,11 @@ pub fn backup(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 
 /// If no guids are provided show a selection of objects in the current savestate.
 /// Otherwise ensure that the guids provided exist.
-fn get_objects(api: &ExternalEditorApi, guids: Guids, message: &str) -> Result<Objects> {
+fn get_objects(api: &ExternalEditorApi, guids: Guids, mode: Mode) -> Result<Objects> {
     let save = Save::read(api)?;
     match guids.guids {
         Some(guids) => validate_guids(save, guids),
-        None => select_objects(save, message, guids.all),
+        None => select_objects(save, mode.msg(), guids.all),
     }
 }
 

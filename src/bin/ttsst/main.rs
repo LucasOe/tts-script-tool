@@ -1,6 +1,7 @@
 mod app;
 mod console;
 mod macros;
+mod msg;
 mod parser;
 
 use clap::{Args, Parser, Subcommand};
