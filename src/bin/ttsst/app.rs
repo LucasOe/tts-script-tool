@@ -65,7 +65,12 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
     for object in save.objects.iter_mut() {
         // Update lua scripts if the path is a lua file
         if let Some(tag) = object.valid_lua()? {
-            let full_path = tag.join_path(&path)?;
+            // If path is a file, only reload objects with that file attached
+            let full_path = match path.is_dir() {
+                true => tag.join_path(&path)?,
+                false => path.clone(),
+            };
+
             if full_path.is_file() && tag == full_path {
                 object.lua_script = read_file(&full_path)?;
                 print_info!("updated:", "{object} with tag {tag}");
@@ -73,7 +78,12 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
         }
         // Update xml ui if the path is a xml file
         if let Some(tag) = object.valid_xml()? {
-            let full_path = tag.join_path(&path)?;
+            // If path is a file, only reload objects with that file attached
+            let full_path = match path.is_dir() {
+                true => tag.join_path(&path)?,
+                false => path.clone(),
+            };
+
             if full_path.is_file() && tag == full_path {
                 object.xml_ui = read_file(&full_path)?;
                 print_info!("updated:", "{object} with tag {tag}");
