@@ -1,6 +1,7 @@
 mod app;
 mod console;
 mod macros;
+mod parser;
 
 use clap::{Parser, Subcommand};
 use colorize::AnsiColor;
@@ -20,11 +21,11 @@ enum Commands {
     /// Attach a script to one or more objects
     Attach {
         /// Path to the file that should be attached
-        #[arg(value_parser)]
+        #[arg(value_parser = parser::path_is_file)]
         path: PathBuf,
 
         /// Optional: The guid(s) of the object(s) the script should be attached to
-        #[arg(value_parser)]
+        #[arg(value_parser = parser::guid)]
         guids: Option<Vec<String>>,
 
         /// Show HandTriggers in the list of objects, if no guids are provided
@@ -35,7 +36,7 @@ enum Commands {
     /// Detach a script from one or more objects
     Detach {
         /// Optional: The guid(s) of the object(s) the script should be detached from
-        #[arg(value_parser)]
+        #[arg(value_parser = parser::guid)]
         guids: Option<Vec<String>>,
 
         /// Show HandTriggers in the list of objects, if no guids are provided
@@ -46,7 +47,7 @@ enum Commands {
     /// Update scripts and reload save
     Reload {
         /// Path to the directory with all scripts
-        #[arg(value_parser)]
+        #[arg(value_parser = parser::path_exists, default_value = ".\\")]
         path: PathBuf,
     },
 
@@ -54,13 +55,14 @@ enum Commands {
     Console {
         /// Optional: Directory to be watched
         #[arg(short, long)]
+        #[arg(value_parser = parser::path_exists)]
         watch: Option<PathBuf>,
     },
 
     /// Backup current save
     Backup {
         /// Path to save location
-        #[arg(value_parser)]
+        #[arg(value_parser = parser::path_is_json)]
         path: PathBuf,
     },
 }
