@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{msg::Mode, print_info, Guids};
+use crate::{msg::Mode, Guids};
+use log::*;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 use ttsst::{Objects, Save, Tag};
@@ -19,14 +20,14 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Guids) -> Result<()
             object.tags.retain(|tag| !tag.is_lua());
             object.tags.push(tag.clone());
             object.lua_script = file.clone();
-            print_info!("added:", "{tag} as a script to {object}");
+            info!("added {tag} as a script to {object}");
         }
         // Add xml tag to objects
         if tag.is_xml() {
             object.tags.retain(|tag| !tag.is_xml());
             object.tags.push(tag.clone());
             object.xml_ui = file.clone();
-            print_info!("added:", "{tag} as a ui element to {object}");
+            info!("added {tag} as a ui element to {object}");
         }
     }
 
@@ -70,7 +71,7 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 
             if full_path.is_file() && tag == full_path {
                 object.lua_script = read_file(&full_path)?;
-                print_info!("updated:", "{object} with tag {tag}");
+                info!("updated {object} with tag {tag}");
             }
         }
         // Update xml ui if the path is a xml file
@@ -83,7 +84,7 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 
             if full_path.is_file() && tag == full_path {
                 object.xml_ui = read_file(&full_path)?;
-                print_info!("updated:", "{object} with tag {tag}");
+                info!("updated {object} with tag {tag}");
             }
         }
     }
@@ -100,7 +101,7 @@ pub fn backup(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 
     // Print information about the file
     let save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap();
-    print_info!("save:", "'{}' as '{}'", save_name, path.display());
+    info!("save '{}' as '{}'", save_name, path.display());
 
     Ok(())
 }
@@ -153,7 +154,7 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
 
     // Reload save
     api.reload(serde_json::json!(objects))?;
-    print_info!("reloaded save!");
+    info!("reloaded save!");
     Ok(())
 }
 
