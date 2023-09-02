@@ -60,9 +60,12 @@ impl TryFrom<&Path> for Tag {
     }
 }
 
-impl PartialEq<Path> for Tag {
-    fn eq(&self, other: &Path) -> bool {
-        self.0 == Tag::try_from(other).unwrap().0
+impl<P: AsRef<Path>> PartialEq<P> for Tag {
+    fn eq(&self, other: &P) -> bool {
+        match Tag::try_from(other.as_ref()) {
+            Ok(tag) => self.0 == tag.0,
+            Err(_) => false,
+        }
     }
 }
 
@@ -96,12 +99,13 @@ impl Tag {
     }
 
     /// Joins the file name from `self` and parent directory from `path`.
-    pub fn join_path(&self, path: &Path) -> Result<PathBuf> {
-        if path.is_file() {
-            return Ok(path.to_path_buf());
+    /// If `path` is a file, `path` gets returned instead without modification.
+    pub fn join_path<P: AsRef<Path>>(&self, path: &P) -> Result<PathBuf> {
+        if path.as_ref().is_file() {
+            return Ok(path.as_ref().to_path_buf());
         }
 
-        let full_path = path.join(self.path()?);
+        let full_path = path.as_ref().join(self.path()?);
         match full_path.exists() {
             true => Ok(full_path),
             false => Err(format!("{} is not a file", full_path.display()).into()),

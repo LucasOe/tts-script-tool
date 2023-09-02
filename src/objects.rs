@@ -105,9 +105,9 @@ impl Object {
         })
     }
 
-    /// Returns a valid [`Tag`], if the list only contains a single valid tag.
-    /// If it contains no valid Tags it returns [`None`].
-    /// If the list contains multiple valid tags, this function returns an [`Error::Msg`].
+    /// Returns a valid [`Tag`], if the list only contains a single valid lua tag.
+    /// If it contains no valid lua Tags it returns [`None`].
+    /// If the list contains multiple valid lua tags, this function returns an [`Error::Msg`].
     pub fn valid_lua(&self) -> Result<Option<Tag>> {
         let valid: Tags = self.tags.iter().filter(|t| t.is_lua()).cloned().collect();
         match valid.len() {
@@ -116,9 +116,9 @@ impl Object {
         }
     }
 
-    /// Returns a valid [`Tag`], if the list only contains a single valid tag.
-    /// If it contains no valid Tags it returns [`None`].
-    /// If the list contains multiple valid tags, this function returns an [`Error::Msg`].
+    /// Returns a valid [`Tag`], if the list only contains a single valid xml tag.
+    /// If it contains no valid xml Tags it returns [`None`].
+    /// If the list contains multiple valid xml tags, this function returns an [`Error::Msg`].
     pub fn valid_xml(&self) -> Result<Option<Tag>> {
         let valid: Tags = self.tags.iter().filter(|t| t.is_xml()).cloned().collect();
         match valid.len() {
