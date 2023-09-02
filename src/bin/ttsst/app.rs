@@ -17,16 +17,29 @@ pub fn attach(
     guids: Option<Vec<String>>,
     show_all: bool,
 ) -> Result<()> {
+    if !path.is_file() {
+        return Err(format!("{} is not a file", path.display()).into());
+    }
+
     let mut objects = get_objects(api, guids, show_all, ATTACH_MESSAGE)?;
 
-    let tag = Tag::from(&path);
-    let script = read_file(&path)?;
-    // Add tag and script to objects
+    let tag = Tag::try_from(path.as_path())?;
+    let file = read_file(&path)?;
     for object in objects.iter_mut() {
-        object.tags.retain(|tag| !tag.is_valid());
-        object.tags.push(tag.clone());
-        object.lua_script = script.clone();
-        print_info!("added:", "{path:?} as a script to {object}");
+        // Add lua tag to objects
+        if tag.is_lua() {
+            object.tags.retain(|tag| !tag.is_lua());
+            object.tags.push(tag.clone());
+            object.lua_script = file.clone();
+            print_info!("added:", "{tag} as a script to {object}");
+        }
+        // Add xml tag to objects
+        if tag.is_xml() {
+            object.tags.retain(|tag| !tag.is_xml());
+            object.tags.push(tag.clone());
+            object.xml_ui = file.clone();
+            print_info!("added:", "{tag} as a ui element to {object}");
+        }
     }
 
     // Add objects to a new save state
@@ -56,15 +69,27 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>, show_all: boo
 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
+    if !path.exists() {
+        return Err(format!("{} does not exist", path.display()).into());
+    }
+
     let mut save = Save::read(api)?;
 
-    // Update the lua script with the file content from the tag
-    // Returns Error if the object has multiple valid tags
     for object in save.objects.iter_mut() {
-        if let Some(tag) = object.tags.valid()? {
-            if (path.is_file() && tag.is_path(&path)) || path.is_dir() {
-                object.lua_script = read_file(&tag.join_path(&path)?)?;
-                print_info!("updated:", "{object} with tag '{tag}'");
+        // Update lua scripts if the path is a lua file
+        if let Some(tag) = object.valid_lua()? {
+            let full_path = tag.join_path(&path)?;
+            if full_path.is_file() && tag.equals_path(&full_path)? {
+                object.lua_script = read_file(&full_path)?;
+                print_info!("updated:", "{object} with tag {tag}");
+            }
+        }
+        // Update xml ui if the path is a xml file
+        if let Some(tag) = object.valid_xml()? {
+            let full_path = tag.join_path(&path)?;
+            if full_path.is_file() && tag.equals_path(&full_path)? {
+                object.xml_ui = read_file(&full_path)?;
+                print_info!("updated:", "{object} with tag {tag}");
             }
         }
     }
@@ -81,9 +106,8 @@ pub fn backup(api: &ExternalEditorApi, mut path: PathBuf) -> Result<()> {
     fs::copy(&save_path, &path)?;
 
     // Print information about the file
-    let save_name_str = Path::new(&save_path).file_name().unwrap().to_str().unwrap();
-    let path_str = path.to_str().unwrap();
-    print_info!("save:", "'{save_name_str}' as '{path_str}'");
+    let save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap();
+    print_info!("save:", "'{}' as '{}'", save_name, path.display());
 
     Ok(())
 }
