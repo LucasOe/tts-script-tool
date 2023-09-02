@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
-use crate::error::Result;
 use crate::tags::Tags;
-use derive_more::{Deref, DerefMut, IntoIterator};
+use crate::{error::Result, Tag};
+use derive_more::{Deref, DerefMut, Display, IntoIterator};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Deserialize, Serialize, Default, Clone, Debug, IntoIterator, Deref, DerefMut)]
+#[derive(Deserialize, Serialize, Default, Clone, Debug, IntoIterator, Deref, DerefMut, Display)]
+#[display(fmt = "{}", "self.0.iter().format(\", \")")]
 pub struct Objects(Vec<Object>);
 
 impl From<Vec<Object>> for Objects {
@@ -101,5 +103,27 @@ impl Object {
             "script": self.lua_script,
             "ui": self.xml_ui,
         })
+    }
+
+    /// Returns a valid [`Tag`], if the list only contains a single valid tag.
+    /// If it contains no valid Tags it returns [`None`].
+    /// If the list contains multiple valid tags, this function returns an [`Error::Msg`].
+    pub fn valid_lua(&self) -> Result<Option<Tag>> {
+        let valid: Tags = self.tags.iter().filter(|t| t.is_lua()).cloned().collect();
+        match valid.len() {
+            0 | 1 => Ok(valid.get(0).cloned()),
+            _ => Err(format!("{self} has multiple valid lua tags: {valid}").into()),
+        }
+    }
+
+    /// Returns a valid [`Tag`], if the list only contains a single valid tag.
+    /// If it contains no valid Tags it returns [`None`].
+    /// If the list contains multiple valid tags, this function returns an [`Error::Msg`].
+    pub fn valid_xml(&self) -> Result<Option<Tag>> {
+        let valid: Tags = self.tags.iter().filter(|t| t.is_xml()).cloned().collect();
+        match valid.len() {
+            0 | 1 => Ok(valid.get(0).cloned()),
+            _ => Err(format!("{self} has multiple valid xml tags: {valid}").into()),
+        }
     }
 }
