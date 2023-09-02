@@ -30,7 +30,7 @@ impl Tags {
 }
 
 /// A tag associated with an [`Object`](crate::objects::Object).
-#[derive(Deserialize, Serialize, Clone, Debug, Display)]
+#[derive(Deserialize, Serialize, Clone, Debug, Display, PartialEq)]
 #[display(fmt = "'{}'", "self.0")]
 pub struct Tag(String);
 
@@ -60,6 +60,12 @@ impl TryFrom<&Path> for Tag {
     }
 }
 
+impl PartialEq<Path> for Tag {
+    fn eq(&self, other: &Path) -> bool {
+        self.0 == Tag::try_from(other).unwrap().0
+    }
+}
+
 impl Tag {
     /// Returns `true` if either `is_lua` or `is_xml` returns true.
     pub fn is_valid(&self) -> bool {
@@ -79,6 +85,7 @@ impl Tag {
     }
 
     /// Returns `self` as a path if it is valid.
+    /// `lua/foo/bar.lua` would return `foo/bar.lua`.
     pub fn path(&self) -> Result<&Path> {
         let path = Path::new(&self.0);
         match self {
@@ -99,9 +106,5 @@ impl Tag {
             true => Ok(full_path),
             false => Err(format!("{} is not a file", full_path.display()).into()),
         }
-    }
-
-    pub fn equals_path(&self, path: &Path) -> Result<bool> {
-        Ok(self.0 == Tag::try_from(path)?.0)
     }
 }
