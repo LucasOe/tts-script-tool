@@ -17,10 +17,6 @@ pub fn attach(
     guids: Option<Vec<String>>,
     show_all: bool,
 ) -> Result<()> {
-    if !path.is_file() {
-        return Err(format!("{} is not a file", path.display()).into());
-    }
-
     let mut objects = get_objects(api, guids, show_all, ATTACH_MESSAGE)?;
 
     let tag = Tag::try_from(path.as_path())?;
@@ -69,10 +65,6 @@ pub fn detach(api: &ExternalEditorApi, guids: Option<Vec<String>>, show_all: boo
 
 /// Update the lua scripts and reload the save file.
 pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
-    if !path.exists() {
-        return Err(format!("{} does not exist", path.display()).into());
-    }
-
     let mut save = Save::read(api)?;
 
     for object in save.objects.iter_mut() {
@@ -100,9 +92,8 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 }
 
 /// Backup current save as file
-pub fn backup(api: &ExternalEditorApi, mut path: PathBuf) -> Result<()> {
+pub fn backup(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
     let save_path = api.get_scripts()?.save_path;
-    path.set_extension("json");
     fs::copy(&save_path, &path)?;
 
     // Print information about the file
