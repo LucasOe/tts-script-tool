@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use colored::*;
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -31,7 +32,7 @@ impl Tags {
 
 /// A tag associated with an [`Object`](crate::objects::Object).
 #[derive(Deserialize, Serialize, Clone, Debug, Display, PartialEq)]
-#[display(fmt = "'{}'", "self.0")]
+#[display(fmt = "{}", "self.0.yellow()")]
 pub struct Tag(String);
 
 impl TryFrom<&Path> for Tag {

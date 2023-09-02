@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::tags::Tags;
 use crate::{error::Result, Tag};
+use colored::*;
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -87,9 +88,9 @@ pub struct Object {
 impl std::fmt::Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match (self.nickname.is_empty(), self.name.is_empty()) {
-            (true, true) => write!(f, "'{}'", self.guid),
-            (true, false) => write!(f, "'{}' ({})", self.guid, self.name),
-            _ => write!(f, "'{}' ({})", self.guid, self.nickname),
+            (true, true) => write!(f, "{}", self.guid.yellow()),
+            (true, false) => write!(f, "{} ({})", self.guid.yellow(), self.name.blue()),
+            #[rustfmt::skip] _ => write!(f, "{} ({})", self.guid.yellow(), self.nickname.blue().bold()),
         }
     }
 }
