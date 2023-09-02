@@ -101,12 +101,9 @@ impl Tag {
     /// Joins the file name from `self` and parent directory from `path`.
     /// If `path` is a file, `path` gets returned instead without modification.
     pub fn join_path<P: AsRef<Path>>(&self, path: &P) -> Result<PathBuf> {
-        if path.as_ref().is_file() {
-            return Ok(path.as_ref().to_path_buf());
-        }
-
-        let full_path = path.as_ref().join(self.path()?);
-        match full_path.exists() {
+        let tag_path = self.path()?;
+        let full_path = path.as_ref().join(tag_path);
+        match full_path.is_file() {
             true => Ok(full_path),
             false => Err(format!("{} is not a file", full_path.display()).into()),
         }
