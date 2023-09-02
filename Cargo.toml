@@ -9,6 +9,7 @@ description = "Attach and update scripts in Tabletop Simulator via the command l
 
 [dependencies]
 clap = { version = "4.1.4", features = ["derive"] }
+colored = "2.0.4"
 derive_more = "0.99.17"
 inquire = "0.5.3"
 itertools = "0.11.0"
