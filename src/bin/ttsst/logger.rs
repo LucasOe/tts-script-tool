@@ -2,11 +2,13 @@ use colored::*;
 use log::*;
 use ttsst::error::Result;
 
-pub struct ConsoleLogger;
+pub struct ConsoleLogger {
+    default_level: Level,
+}
 
 impl log::Log for ConsoleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Info
+        metadata.level() <= self.default_level
     }
 
     fn log(&self, record: &Record) {
@@ -26,8 +28,8 @@ impl log::Log for ConsoleLogger {
 
             #[rustfmt::skip]
             match record.level() {
-                Level::Error => println!("{} {}", level_string, record.args()),
-                _           => eprintln!("{} {}", level_string, record.args()),
+                Level::Error => eprintln!("{} {}", level_string, record.args()),
+                _            =>  println!("{} {}", level_string, record.args()),
             };
         }
     }
@@ -36,10 +38,14 @@ impl log::Log for ConsoleLogger {
 }
 
 impl ConsoleLogger {
+    #[must_use = "You must call init() to begin logging"]
     pub fn new() -> Self {
-        ConsoleLogger {}
+        ConsoleLogger {
+            default_level: Level::Trace,
+        }
     }
 
+    #[must_use = "You must call init() to begin logging"]
     pub fn init(self, log_level: LevelFilter) -> Result<()> {
         log::set_boxed_logger(Box::new(self))?;
         log::set_max_level(log_level);
