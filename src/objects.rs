@@ -43,7 +43,7 @@ impl Objects {
     pub fn find_object(self, guid: &str) -> Result<Object> {
         self.into_iter()
             .find(|object| object.guid == guid)
-            .ok_or("{guid} does not exist".into())
+            .ok_or(format!("{} does not exist", guid.yellow()).into())
     }
 
     /// Filter out `HandTrigger`, `FogOfWar` and `FogOfWarTrigger` objects.
@@ -87,10 +87,14 @@ pub struct Object {
 
 impl std::fmt::Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let guid_c = self.guid.yellow();
+        let name_c = self.name.blue();
+        let nickname_c = self.nickname.blue().bold();
+
         match (self.nickname.is_empty(), self.name.is_empty()) {
-            (true, true) => write!(f, "{}", self.guid.yellow()),
-            (true, false) => write!(f, "{} ({})", self.guid.yellow(), self.name.blue()),
-            #[rustfmt::skip] _ => write!(f, "{} ({})", self.guid.yellow(), self.nickname.blue().bold()),
+            (true, true) => write!(f, "{}", guid_c),
+            (true, false) => write!(f, "{} ({})", guid_c, name_c),
+            _ => write!(f, "{} ({})", guid_c, nickname_c),
         }
     }
 }
