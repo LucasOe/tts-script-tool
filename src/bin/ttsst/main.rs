@@ -1,11 +1,12 @@
 mod app;
 mod console;
+mod logger;
 mod msg;
 mod parser;
 
+use crate::logger::ConsoleLogger;
 use clap::{Args, Parser, Subcommand};
 use log::*;
-use simplelog::{Color, ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use std::path::PathBuf;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
@@ -87,28 +88,12 @@ fn main() {
     }
 }
 
-fn init_logger(verbosity: u8) -> Result<()> {
-    let log_level = match verbosity {
+fn run(args: Cli) -> Result<()> {
+    ConsoleLogger::new().init(match args.verbosity {
         0 => LevelFilter::Info,
         1 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
-    };
-
-    let config = simplelog::ConfigBuilder::new()
-        .set_time_level(LevelFilter::Off)
-        .set_level_color(Level::Error, Some(Color::Red))
-        .set_level_color(Level::Warn, Some(Color::Yellow))
-        .set_level_color(Level::Info, Some(Color::Green))
-        .set_level_color(Level::Debug, Some(Color::Blue))
-        .set_level_color(Level::Trace, Some(Color::Magenta))
-        .build();
-
-    TermLogger::init(log_level, config, TerminalMode::Mixed, ColorChoice::Auto)
-        .map_err(|err| err.into())
-}
-
-fn run(args: Cli) -> Result<()> {
-    init_logger(args.verbosity)?;
+    })?;
 
     let api = ExternalEditorApi::new();
     match args.command {
