@@ -11,6 +11,9 @@ use ttsst::{Objects, Save, Tag};
 /// and then reloads the save, the same way it does when pressing "Save & Play".
 pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Guids) -> Result<()> {
     let mut objects = get_objects(api, guids, Mode::Attach)?;
+    trace!("Trace");
+    debug!("Debug");
+    warn!("Warn");
 
     let tag = Tag::try_from(path.as_path())?;
     let file = read_file(&path)?;
