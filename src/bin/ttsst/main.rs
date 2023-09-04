@@ -6,9 +6,7 @@ mod parser;
 
 use crate::logger::ConsoleLogger;
 use clap::{Args, Parser, Subcommand};
-use log::*;
 use std::path::PathBuf;
-use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 
 #[derive(Parser, Debug)]
@@ -83,25 +81,26 @@ fn main() {
     let cli = Cli::parse();
 
     if let Err(err) = run(cli) {
-        error!("{}", err);
+        log::error!("{}", err);
         std::process::exit(1);
     }
 }
 
 fn run(args: Cli) -> Result<()> {
+    use log::LevelFilter;
     ConsoleLogger::new().init(match args.verbosity {
         0 => LevelFilter::Info,
         1 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
     })?;
 
-    let api = ExternalEditorApi::new();
+    let api = tts_external_api::ExternalEditorApi::new();
     match args.command {
         Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
         Commands::Detach { guids } => app::detach(&api, guids)?,
+        Commands::Reload { path } => app::reload(&api, path)?,
         Commands::Backup { path } => app::backup(&api, path)?,
         Commands::Console { watch } => console::start(api, watch)?,
-        Commands::Reload { path } => app::reload(&api, path)?,
     }
     Ok(())
 }

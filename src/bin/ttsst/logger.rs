@@ -2,13 +2,11 @@ use colored::*;
 use log::*;
 use ttsst::error::Result;
 
-pub struct ConsoleLogger {
-    default_level: Level,
-}
+pub struct ConsoleLogger;
 
 impl log::Log for ConsoleLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= self.default_level
+    fn enabled(&self, _: &Metadata) -> bool {
+        true // no need to filter after using ‘set_max_level’.
     }
 
     fn log(&self, record: &Record) {
@@ -40,9 +38,7 @@ impl log::Log for ConsoleLogger {
 impl ConsoleLogger {
     #[must_use = "You must call init() to begin logging"]
     pub fn new() -> Self {
-        ConsoleLogger {
-            default_level: Level::Trace,
-        }
+        ConsoleLogger
     }
 
     #[must_use = "You must call init() to begin logging"]
