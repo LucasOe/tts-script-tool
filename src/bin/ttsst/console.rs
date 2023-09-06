@@ -33,7 +33,7 @@ fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
                 Answer::AnswerError(answer) => error!("{}", answer.error_message_prefix),
                 // When calling `crate::app::reload` in the watch thread,
                 // reloading and writing to the save file is causing multiple prints.
-                // Answer::AnswerReload(_answer) => info!("{}", "Loading complete.".green()),
+                // Answer::AnswerReload(answer) => info!("reloaded {}", answer.save_path),
                 _ => {}
             }
 
