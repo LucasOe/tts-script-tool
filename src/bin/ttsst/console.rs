@@ -10,6 +10,17 @@ use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 
+trait PathExt {
+    fn strip_current_dir(&self) -> Result<PathBuf>;
+}
+
+impl PathExt for PathBuf {
+    fn strip_current_dir(&self) -> Result<PathBuf> {
+        let path = self.strip_prefix(std::env::current_dir()?)?;
+        Ok(PathBuf::from(".\\").join(path))
+    }
+}
+
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
 pub fn start(api: ExternalEditorApi, path: Option<PathBuf>) -> Result<()> {
@@ -62,19 +73,12 @@ fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
 
         loop {
             if let Ok(events) = rx.recv().unwrap() {
-                let event = events
-                    .into_iter()
-                    .find(|event| event.kind == debouncer::DebouncedEventKind::Any);
+                let kind = debouncer::DebouncedEventKind::Any;
+                let event = events.into_iter().find(|event| event.kind == kind);
 
                 if let Some(event) = event {
-                    // Make `event.path` relative
-                    let path = PathBuf::from("./").join(
-                        event
-                            .path
-                            .strip_prefix(std::env::current_dir().unwrap())
-                            .unwrap(),
-                    );
-                    crate::app::reload(&api, path)?;
+                    let file_path = event.path.strip_current_dir()?;
+                    crate::app::reload(&api, file_path)?;
                 }
             }
         }

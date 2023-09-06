@@ -14,6 +14,8 @@ pub enum Error {
     NotifyError(#[from] notify_debouncer_mini::notify::Error),
     #[error(transparent)]
     SetLoggerError(#[from] log::SetLoggerError),
+    #[error(transparent)]
+    StripPrefixError(#[from] std::path::StripPrefixError),
     #[error("{0}")]
     Msg(String),
 }
