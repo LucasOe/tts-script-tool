@@ -5,7 +5,9 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use colored::*;
-use notify_debouncer_mini::{self as notify, notify::RecursiveMode};
+use log::*;
+use notify::{self, RecursiveMode};
+use notify_debouncer_mini::{self as debouncer};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
@@ -72,19 +74,20 @@ fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
 
         // Create notify watcher
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut debouncer = notify::new_debouncer(Duration::from_millis(500), None, tx)?;
+        let mut debouncer = debouncer::new_debouncer(Duration::from_millis(500), tx)?;
         debouncer.watcher().watch(&path, RecursiveMode::Recursive)?;
 
-        loop {
-            if let Ok(events) = rx.recv().unwrap() {
-                let kind = notify::DebouncedEventKind::Any;
-                let event = events.into_iter().find(|event| event.kind == kind);
-
-                if let Some(event) = event {
-                    let file_path = event.path.strip_current_dir()?;
-                    crate::app::reload(&api, file_path)?;
-                }
+        for result in rx {
+            match result {
+                // If more than one files changes, reload every file
+                Ok(events) => match events.len() {
+                    1 => crate::app::reload(&api, events[0].path.clone())?,
+                    _ => crate::app::reload(&api, path.clone())?,
+                },
+                Err(err) => error!("{}", err),
             }
         }
+
+        Ok(())
     })
 }
