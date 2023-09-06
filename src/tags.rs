@@ -43,7 +43,7 @@ impl TryFrom<&Path> for Tag {
         use path_slash::PathExt as _;
 
         // Note: `strip_prefix("./")` doesn't remove `.\\` on linux
-        let file_path = match path.strip_prefix("./") {
+        let file_path = match path.strip_prefix(".\\") {
             Ok(file_path) => file_path.to_slash_lossy(), // Replace `\` with `/`
             Err(_) => return Err("Path has to be relative".into()),
         };
