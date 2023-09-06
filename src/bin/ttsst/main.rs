@@ -58,15 +58,17 @@ enum Commands {
         /// If the path is a single file, only objects with that file attached will get reloaded.
         #[arg(value_name = "PATH")]
         #[arg(value_parser = parser::path_exists, default_value = ".\\")]
-        path: PathBuf,
+        paths: Vec<PathBuf>,
     },
 
     /// Show print, log and error messages in the console
-    Console {
-        /// Optional: Directory to be watched
-        #[arg(short, long, value_name = "PATH")]
-        #[arg(value_parser = parser::path_exists)]
-        watch: Option<PathBuf>,
+    Console,
+
+    /// Watch file(s)
+    Watch {
+        #[arg(value_name = "PATH")]
+        #[arg(value_parser = parser::path_exists, default_value = ".\\")]
+        paths: Option<Vec<PathBuf>>,
     },
 
     /// Backup current save
@@ -98,9 +100,10 @@ fn run(args: Cli) -> Result<()> {
     match args.command {
         Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
         Commands::Detach { guids } => app::detach(&api, guids)?,
-        Commands::Reload { path } => app::reload(&api, path)?,
+        Commands::Reload { paths } => app::reload(&api, paths)?,
         Commands::Backup { path } => app::backup(&api, path)?,
-        Commands::Console { watch } => console::start(api, watch)?,
+        Commands::Console => console::start(api, None)?,
+        Commands::Watch { paths } => console::start(api, paths)?,
     }
     Ok(())
 }
