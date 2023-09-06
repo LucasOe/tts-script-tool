@@ -5,7 +5,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use colored::*;
-use notify_debouncer_mini::{self as debouncer, notify::RecursiveMode};
+use notify_debouncer_mini::{self as notify, notify::RecursiveMode};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
@@ -38,7 +38,15 @@ pub fn start(api: ExternalEditorApi, path: Option<PathBuf>) -> Result<()> {
 fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
     thread::spawn(move || -> Result<()> {
         loop {
+            // Forward the message to the TcpStream on port 39997 if a connection exists
             let buffer = api.read_string();
+            if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
+                stream.write_all(buffer.as_bytes())?;
+                stream.flush()?;
+            }
+
+            // Print Answer
+            // Note: When reloading there isn't a strict order of messages sent from the server
             match serde_json::from_str(&buffer)? {
                 Answer::AnswerPrint(answer) => println!("{}", answer.message),
                 Answer::AnswerError(answer) => println!("{}", answer.error_message_prefix.red()),
@@ -46,12 +54,6 @@ fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
                 // reloading and writing to the save file is causing multiple prints.
                 // Answer::AnswerReload(answer) => println!("reloaded {}", answer.save_path),
                 _ => {}
-            }
-
-            // Forward the message to the TcpStream on port 39997 if a connection exists
-            if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
-                stream.write_all(buffer.as_bytes())?;
-                stream.flush()?;
             }
         }
     })
@@ -68,12 +70,12 @@ fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
 
         // Create notify watcher
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut debouncer = debouncer::new_debouncer(Duration::from_millis(500), None, tx)?;
+        let mut debouncer = notify::new_debouncer(Duration::from_millis(500), None, tx)?;
         debouncer.watcher().watch(&path, RecursiveMode::Recursive)?;
 
         loop {
             if let Ok(events) = rx.recv().unwrap() {
-                let kind = debouncer::DebouncedEventKind::Any;
+                let kind = notify::DebouncedEventKind::Any;
                 let event = events.into_iter().find(|event| event.kind == kind);
 
                 if let Some(event) = event {
