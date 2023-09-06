@@ -23,6 +23,7 @@ struct Cli {
 #[derive(Args, Debug)]
 pub struct Guids {
     /// Optional: The guid(s) of the object(s) the script should be attached to
+    #[arg(value_name = "GUID(s)")]
     #[arg(value_parser = parser::guid)]
     guids: Option<Vec<String>>,
 
@@ -33,7 +34,7 @@ pub struct Guids {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Attach a script to one or more objects
+    /// Attach a lua script or xml ui to object(s)
     Attach {
         /// Path to the file that should be attached.
         /// ttsst will use the current working directory as a root.
@@ -45,33 +46,32 @@ enum Commands {
         guids: Guids,
     },
 
-    /// Detach a script from one or more objects
+    /// Detach lua script and xml ui from object(s)
     Detach {
         #[command(flatten)]
         guids: Guids,
     },
 
-    /// Update scripts and reload save
+    /// Reload path(s)
     Reload {
-        /// Path to the directory with all scripts.
-        ///
-        /// If the path is a single file, only objects with that file attached will get reloaded.
-        #[arg(value_name = "PATH")]
+        /// The path(s) that will be reloaded
+        #[arg(value_name = "PATH(S)")]
         #[arg(value_parser = parser::path_exists, default_value = ".\\")]
         paths: Vec<PathBuf>,
     },
 
-    /// Show print, log and error messages in the console
+    /// Mirror messages from Tabletop Simulator to the console
     Console,
 
-    /// Watch file(s) and reload on change
+    /// Watch path(s) and reload on change
     Watch {
-        #[arg(value_name = "PATH")]
+        /// The path(s) that will be watched for changes
+        #[arg(value_name = "PATH(S)")]
         #[arg(value_parser = parser::path_exists, default_value = ".\\")]
         paths: Vec<PathBuf>,
     },
 
-    /// Backup current save
+    /// Backup current save as a json file
     Backup {
         /// Path to save location
         #[arg(value_parser = parser::path_is_json)]
