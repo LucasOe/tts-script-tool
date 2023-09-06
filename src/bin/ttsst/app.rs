@@ -111,8 +111,8 @@ pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
     }
 
     // Use the first path that is a dir to search for global files
+    // TODO: Support Global files in subdirectories: Add `-g` flag or search recursively
     if let Some(path) = &paths.into_iter().find(|path| path.is_dir()) {
-        dbg!(path);
         update_global(&mut save, path)?;
     }
 

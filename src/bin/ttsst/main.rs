@@ -64,11 +64,11 @@ enum Commands {
     /// Show print, log and error messages in the console
     Console,
 
-    /// Watch file(s)
+    /// Watch file(s) and reload on change
     Watch {
         #[arg(value_name = "PATH")]
         #[arg(value_parser = parser::path_exists, default_value = ".\\")]
-        paths: Option<Vec<PathBuf>>,
+        paths: Vec<PathBuf>,
     },
 
     /// Backup current save
@@ -101,9 +101,9 @@ fn run(args: Cli) -> Result<()> {
         Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
         Commands::Detach { guids } => app::detach(&api, guids)?,
         Commands::Reload { paths } => app::reload(&api, paths)?,
-        Commands::Backup { path } => app::backup(&api, path)?,
         Commands::Console => console::start(api, None)?,
-        Commands::Watch { paths } => console::start(api, paths)?,
+        Commands::Watch { paths } => console::start(api, Some(paths))?,
+        Commands::Backup { path } => app::backup(&api, path)?,
     }
     Ok(())
 }
