@@ -67,7 +67,14 @@ fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
                     .find(|event| event.kind == debouncer::DebouncedEventKind::Any);
 
                 if let Some(event) = event {
-                    crate::app::reload(&api, event.path)?;
+                    // Make `event.path` relative
+                    let path = PathBuf::from("./").join(
+                        event
+                            .path
+                            .strip_prefix(std::env::current_dir().unwrap())
+                            .unwrap(),
+                    );
+                    crate::app::reload(&api, path)?;
                 }
             }
         }
