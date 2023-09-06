@@ -58,57 +58,64 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
+pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
     let mut save = Save::read(api)?;
 
-    for object in save.objects.iter_mut() {
-        // Update lua scripts if the path is a lua file
-        match object.valid_lua()? {
-            Some(tag) => {
-                // If path is a file, only reload objects with that file attached
-                let full_path = match path.is_dir() {
-                    true => tag.join_path(&path)?,
-                    false => path.clone(),
-                };
+    for path in &paths {
+        for object in save.objects.iter_mut() {
+            // Update lua scripts if the path is a lua file
+            match object.valid_lua()? {
+                Some(tag) => {
+                    // If path is a file, only reload objects with that file attached
+                    let full_path = match path.is_dir() {
+                        true => tag.join_path(&path)?,
+                        false => path.clone(),
+                    };
 
-                if full_path.is_file() && tag == full_path {
-                    object.lua_script = read_file(&full_path)?;
-                    info!("updated {object} with tag {tag}");
+                    if full_path.is_file() && tag == full_path {
+                        object.lua_script = read_file(&full_path)?;
+                        info!("updated {object} with tag {tag}");
+                    }
+                }
+                // Remove lua script if the objects has no valid tag
+                None => {
+                    if !object.lua_script.is_empty() {
+                        object.lua_script = "".to_string();
+                        info!("removed lua script from {}", object);
+                    }
                 }
             }
-            // Remove lua script if the objects has no valid tag
-            None => {
-                if !object.lua_script.is_empty() {
-                    object.lua_script = "".to_string();
-                    info!("removed lua script from {}", object);
-                }
-            }
-        }
-        // Update xml ui if the path is a xml file
-        match object.valid_xml()? {
-            Some(tag) => {
-                // If path is a file, only reload objects with that file attached
-                let full_path = match path.is_dir() {
-                    true => tag.join_path(&path)?,
-                    false => path.clone(),
-                };
+            // Update xml ui if the path is a xml file
+            match object.valid_xml()? {
+                Some(tag) => {
+                    // If path is a file, only reload objects with that file attached
+                    let full_path = match path.is_dir() {
+                        true => tag.join_path(&path)?,
+                        false => path.clone(),
+                    };
 
-                if full_path.is_file() && tag == full_path {
-                    object.xml_ui = read_file(&full_path)?;
-                    info!("updated {object} with tag {tag}");
+                    if full_path.is_file() && tag == full_path {
+                        object.xml_ui = read_file(&full_path)?;
+                        info!("updated {object} with tag {tag}");
+                    }
                 }
-            }
-            // Remove xml ui if the objects has no valid tag
-            None => {
-                if !object.xml_ui.is_empty() {
-                    object.xml_ui = "".to_string();
-                    info!("removed xml ui from {}", object);
+                // Remove xml ui if the objects has no valid tag
+                None => {
+                    if !object.xml_ui.is_empty() {
+                        object.xml_ui = "".to_string();
+                        info!("removed xml ui from {}", object);
+                    }
                 }
             }
         }
     }
 
-    update_global(&mut save, &path)?;
+    // Use the first path that is a dir to search for global files
+    if let Some(path) = &paths.into_iter().find(|path| path.is_dir()) {
+        dbg!(path);
+        update_global(&mut save, path)?;
+    }
+
     update_save(api, &save)?;
     Ok(())
 }

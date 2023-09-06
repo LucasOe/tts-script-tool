@@ -25,7 +25,7 @@ impl PathExt for PathBuf {
 
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
-pub fn start(api: ExternalEditorApi, path: Option<PathBuf>) -> Result<()> {
+pub fn start(api: ExternalEditorApi, path: Option<Vec<PathBuf>>) -> Result<()> {
     let console_handle = console(api, path.is_some());
     let watch_handle = path.map(watch);
 
@@ -65,7 +65,7 @@ fn console(api: ExternalEditorApi, watching: bool) -> JoinHandle<Result<()>> {
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
 /// This thread uses its own `ExternalEditorApi` listening to port 39997.
-fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
+fn watch(paths: Vec<PathBuf>) -> JoinHandle<Result<()>> {
     thread::spawn(move || -> Result<()> {
         // Constructs a new `ExternalEditorApi` listening to port 39997
         let api = tts_external_api::ExternalEditorApi {
@@ -74,16 +74,18 @@ fn watch(path: PathBuf) -> JoinHandle<Result<()>> {
 
         // Create notify watcher
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut debouncer = debouncer::new_debouncer(Duration::from_millis(500), tx)?;
-        debouncer.watcher().watch(&path, RecursiveMode::Recursive)?;
+        let mut watcher = debouncer::new_debouncer(Duration::from_millis(500), tx)?;
 
-        for result in rx {
+        for path in &paths {
+            watcher.watcher().watch(path, RecursiveMode::Recursive)?;
+        }
+
+        while let Ok(result) = rx.recv() {
             match result {
-                // If more than one files changes, reload every file
-                Ok(events) => match events.len() {
-                    1 => crate::app::reload(&api, events[0].path.clone())?,
-                    _ => crate::app::reload(&api, path.clone())?,
-                },
+                Ok(events) => {
+                    let paths = events.into_iter().map(|event| event.path).collect();
+                    crate::app::reload(&api, paths)?
+                }
                 Err(err) => error!("{}", err),
             }
         }
