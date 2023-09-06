@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::tags::Tags;
 use crate::{error::Result, Tag};
+
 use colored::*;
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use itertools::Itertools;
