@@ -31,8 +31,9 @@ fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
             match serde_json::from_str(&buffer)? {
                 Answer::AnswerPrint(answer) => info!("{}", answer.message),
                 Answer::AnswerError(answer) => error!("{}", answer.error_message_prefix),
-                // `MessageGetScripts` returns `AnswerReload` causing multiple prints
-                // Answer::AnswerReload(_answer) => println!("{}", "Loading complete.".green()),
+                // When calling `crate::app::reload` in the watch thread,
+                // reloading and writing to the save file is causing multiple prints.
+                // Answer::AnswerReload(_answer) => info!("{}", "Loading complete.".green()),
                 _ => {}
             }
 

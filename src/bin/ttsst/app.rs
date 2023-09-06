@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::{msg::Mode, Guids};
+use colored::Colorize;
 use log::*;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
@@ -154,7 +155,7 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
 
     // Reload save
     api.reload(serde_json::json!(objects))?;
-    info!("reloaded save!");
+    info!("reloaded {}", save.name.blue());
     Ok(())
 }
 
