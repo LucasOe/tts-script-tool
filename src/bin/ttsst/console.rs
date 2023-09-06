@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use log::*;
+use colored::*;
 use notify_debouncer_mini::{self as debouncer, notify::RecursiveMode};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
@@ -29,11 +29,11 @@ fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
         loop {
             let buffer = api.read_string();
             match serde_json::from_str(&buffer)? {
-                Answer::AnswerPrint(answer) => info!("{}", answer.message),
-                Answer::AnswerError(answer) => error!("{}", answer.error_message_prefix),
+                Answer::AnswerPrint(answer) => println!("{}", answer.message),
+                Answer::AnswerError(answer) => println!("{}", answer.error_message_prefix.red()),
                 // When calling `crate::app::reload` in the watch thread,
                 // reloading and writing to the save file is causing multiple prints.
-                // Answer::AnswerReload(answer) => info!("reloaded {}", answer.save_path),
+                // Answer::AnswerReload(answer) => println!("reloaded {}", answer.save_path),
                 _ => {}
             }
 
