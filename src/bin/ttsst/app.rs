@@ -1,12 +1,26 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{msg::Mode, Guids};
+use crate::Guids;
 use colored::Colorize;
 use log::*;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 use ttsst::{Objects, Save, Tag};
+
+pub enum Mode {
+    Attach,
+    Detach,
+}
+
+impl Mode {
+    pub fn msg(&self) -> &str {
+        match self {
+            Mode::Attach => "Select the object to attach the script or ui element to:",
+            Mode::Detach => "Select the object to detach the script and ui element from:",
+        }
+    }
+}
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".

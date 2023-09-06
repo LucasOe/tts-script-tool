@@ -1,7 +1,6 @@
 mod app;
 mod console;
 mod logger;
-mod msg;
 mod parser;
 
 use crate::logger::ConsoleLogger;
