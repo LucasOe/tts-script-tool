@@ -63,30 +63,38 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 
     for object in save.objects.iter_mut() {
         // Update lua scripts if the path is a lua file
-        if let Some(tag) = object.valid_lua()? {
-            // If path is a file, only reload objects with that file attached
-            let full_path = match path.is_dir() {
-                true => tag.join_path(&path)?,
-                false => path.clone(),
-            };
+        match object.valid_lua()? {
+            Some(tag) => {
+                // If path is a file, only reload objects with that file attached
+                let full_path = match path.is_dir() {
+                    true => tag.join_path(&path)?,
+                    false => path.clone(),
+                };
 
-            if full_path.is_file() && tag == full_path {
-                object.lua_script = read_file(&full_path)?;
-                info!("updated {object} with tag {tag}");
+                if full_path.is_file() && tag == full_path {
+                    object.lua_script = read_file(&full_path)?;
+                    info!("updated {object} with tag {tag}");
+                }
             }
+            // Remove lua script if the objects has no valid tag
+            None => object.lua_script = "".to_string(),
         }
         // Update xml ui if the path is a xml file
-        if let Some(tag) = object.valid_xml()? {
-            // If path is a file, only reload objects with that file attached
-            let full_path = match path.is_dir() {
-                true => tag.join_path(&path)?,
-                false => path.clone(),
-            };
+        match object.valid_xml()? {
+            Some(tag) => {
+                // If path is a file, only reload objects with that file attached
+                let full_path = match path.is_dir() {
+                    true => tag.join_path(&path)?,
+                    false => path.clone(),
+                };
 
-            if full_path.is_file() && tag == full_path {
-                object.xml_ui = read_file(&full_path)?;
-                info!("updated {object} with tag {tag}");
+                if full_path.is_file() && tag == full_path {
+                    object.xml_ui = read_file(&full_path)?;
+                    info!("updated {object} with tag {tag}");
+                }
             }
+            // Remove xml ui if the objects has no valid tag
+            None => object.xml_ui = "".to_string(),
         }
     }
 
