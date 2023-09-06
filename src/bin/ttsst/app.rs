@@ -78,8 +78,10 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
             }
             // Remove lua script if the objects has no valid tag
             None => {
-                object.lua_script = "".to_string();
-                info!("removed lua script from {}", object);
+                if !object.lua_script.is_empty() {
+                    object.lua_script = "".to_string();
+                    info!("removed lua script from {}", object);
+                }
             }
         }
         // Update xml ui if the path is a xml file
@@ -98,8 +100,10 @@ pub fn reload(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
             }
             // Remove xml ui if the objects has no valid tag
             None => {
-                object.xml_ui = "".to_string();
-                info!("removed xml ui from {}", object);
+                if !object.xml_ui.is_empty() {
+                    object.xml_ui = "".to_string();
+                    info!("removed xml ui from {}", object);
+                }
             }
         }
     }
