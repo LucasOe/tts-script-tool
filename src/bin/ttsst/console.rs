@@ -24,7 +24,7 @@ impl PathExt for PathBuf {
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
 pub fn start(api: ExternalEditorApi, path: Option<PathBuf>) -> Result<()> {
-    let console_handle = console(api);
+    let console_handle = console(api, path.is_some());
     let watch_handle = path.map(watch);
 
     // Wait for threads to finish. Threads should only finish if they return an error.
@@ -35,24 +35,26 @@ pub fn start(api: ExternalEditorApi, path: Option<PathBuf>) -> Result<()> {
 
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
-fn console(api: ExternalEditorApi) -> JoinHandle<Result<()>> {
+fn console(api: ExternalEditorApi, watching: bool) -> JoinHandle<Result<()>> {
     thread::spawn(move || -> Result<()> {
         loop {
             // Forward the message to the TcpStream on port 39997 if a connection exists
             let buffer = api.read_string();
-            if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
-                stream.write_all(buffer.as_bytes())?;
-                stream.flush()?;
+            if watching {
+                if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
+                    stream.write_all(buffer.as_bytes())?;
+                    stream.flush()?;
+                }
             }
 
             // Print Answer
             // Note: When reloading there isn't a strict order of messages sent from the server
             match serde_json::from_str(&buffer)? {
-                Answer::AnswerPrint(answer) => println!("{}", answer.message),
+                Answer::AnswerPrint(answer) => println!("{}", answer.message.bright_white()),
                 Answer::AnswerError(answer) => println!("{}", answer.error_message_prefix.red()),
                 // When calling `crate::app::reload` in the watch thread,
                 // reloading and writing to the save file is causing multiple prints.
-                // Answer::AnswerReload(answer) => println!("reloaded {}", answer.save_path),
+                Answer::AnswerReload(_) if !watching => println!("{}", "Loading complete.".green()),
                 _ => {}
             }
         }
