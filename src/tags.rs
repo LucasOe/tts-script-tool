@@ -63,10 +63,7 @@ impl TryFrom<&Path> for Tag {
 
 impl<P: AsRef<Path>> PartialEq<P> for Tag {
     fn eq(&self, other: &P) -> bool {
-        match Tag::try_from(other.as_ref()) {
-            Ok(tag) => self.0 == tag.0,
-            Err(_) => false,
-        }
+        matches!(Tag::try_from(other.as_ref()), Ok(tag) if self.0 == tag.0)
     }
 }
 
