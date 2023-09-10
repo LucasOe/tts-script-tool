@@ -88,15 +88,25 @@ pub struct Object {
 
 impl std::fmt::Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let guid_c = self.guid.yellow();
-        let name_c = self.name.blue();
-        let nickname_c = self.nickname.blue().bold();
-
-        match (self.nickname.is_empty(), self.name.is_empty()) {
-            (true, true) => write!(f, "{}", guid_c),
-            (true, false) => write!(f, "{} ({})", guid_c, name_c),
-            _ => write!(f, "{} ({})", guid_c, nickname_c),
-        }
+        let s = vec![
+            // Guid
+            format!("{}", self.guid.yellow()),
+            // Name / Nickname
+            match !self.nickname.is_empty() {
+                true => format!("({})", self.nickname.bright_white().bold()),
+                false => format!("({})", self.name.bright_white()),
+            },
+            // Tag
+            match (self.valid_lua(), self.valid_xml()) {
+                (Ok(Some(lua)), Ok(None)) => format!("using {}", lua),
+                (Ok(None), Ok(Some(xml))) => format!("using {}", xml),
+                (Ok(Some(lua)), Ok(Some(xml))) => format!("using {} and {}", lua, xml),
+                _ => "".to_string(),
+            },
+        ];
+        // Filter out empty strings and join the remaining ones
+        let res = s.into_iter().filter(|s| !s.is_empty()).join(" ");
+        write!(f, "{}", res)
     }
 }
 
