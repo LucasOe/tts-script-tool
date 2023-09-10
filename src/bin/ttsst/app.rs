@@ -35,14 +35,14 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Guids) -> Result<()
             object.tags.retain(|tag| !tag.is_lua());
             object.tags.push(tag.clone());
             object.lua_script = file.clone();
-            info!("added {tag} as a script to {object}");
+            info!("attached script to {object}");
         }
         // Add xml tag to objects
         if tag.is_xml() {
             object.tags.retain(|tag| !tag.is_xml());
             object.tags.push(tag.clone());
             object.xml_ui = file.clone();
-            info!("added {tag} as a ui element to {object}");
+            info!("attached ui element to {object}");
         }
     }
 
@@ -81,7 +81,7 @@ pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
             match object.valid_lua()? {
                 Some(tag) if tag.starts_with(&path) => {
                     object.lua_script = read_file(&tag.path()?)?;
-                    info!("updated {object} with tag {tag}");
+                    info!("updated {object}");
                 }
                 // Remove lua script if the objects has no valid tag
                 None if !object.lua_script.is_empty() => {
@@ -94,7 +94,7 @@ pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
             match object.valid_xml()? {
                 Some(tag) if tag.starts_with(&path) => {
                     object.xml_ui = read_file(&tag.path()?)?;
-                    info!("updated {object} with tag {tag}");
+                    info!("updated {object}");
                 }
                 // Remove xml ui if the objects has no valid tag
                 None if !object.xml_ui.is_empty() => {
