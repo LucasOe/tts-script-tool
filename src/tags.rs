@@ -2,6 +2,7 @@ use crate::error::{Error, Result};
 use colored::*;
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use itertools::Itertools;
+use path_slash::PathExt;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -40,8 +41,6 @@ impl TryFrom<&Path> for Tag {
 
     /// Create a new tag from a path, using `scripts/<FilePath>.lua` and `ui/<FilePath>.xml` as a naming convention.
     fn try_from(path: &Path) -> Result<Self> {
-        use path_slash::PathExt as _;
-
         // Note: `strip_prefix` might not work on linux systems
         let file_path = match path.strip_prefix(".\\") {
             Ok(file_path) => file_path.to_slash_lossy(), // Replace `\` with `/`
@@ -58,12 +57,6 @@ impl TryFrom<&Path> for Tag {
             "xml" => Ok(Self(format!("xml/{}", file_path))),
             _ => Err("Path is not a lua or xml file".into()),
         }
-    }
-}
-
-impl<P: AsRef<Path>> PartialEq<P> for Tag {
-    fn eq(&self, other: &P) -> bool {
-        matches!(Tag::try_from(other.as_ref()), Ok(tag) if self.0 == tag.0)
     }
 }
 
@@ -86,24 +79,22 @@ impl Tag {
     }
 
     /// Returns `self` as a path if it is valid.
-    /// `lua/foo/bar.lua` would return `foo/bar.lua`.
-    pub fn path(&self) -> Result<&Path> {
+    /// `lua/foo/bar.lua` would return `./foo/bar.lua`.
+    pub fn path(&self) -> Result<PathBuf> {
         let path = Path::new(&self.0);
         match self {
             _ if self.is_lua() => Ok(path.strip_prefix("lua/")?),
             _ if self.is_xml() => Ok(path.strip_prefix("xml/")?),
             _ => Err("{self} is not a valid tag".into()),
         }
+        .map(|file| Path::new("./").join(file))
     }
 
-    /// Joins the file name from `self` and parent directory from `path`.
-    /// If `path` is a file, `path` gets returned instead without modification.
-    pub fn join_path<P: AsRef<Path>>(&self, path: &P) -> Result<PathBuf> {
-        let tag_path = self.path()?;
-        let full_path = path.as_ref().join(tag_path);
-        match full_path.is_file() {
-            true => Ok(full_path),
-            false => Err(format!("{} is not a file", full_path.display()).into()),
+    /// Determines whether `base` is a prefix of `self`.
+    pub fn starts_with<P: AsRef<Path>>(&self, base: &P) -> bool {
+        match self.path() {
+            Ok(path) => path.starts_with(base),
+            Err(_) => false,
         }
     }
 }
