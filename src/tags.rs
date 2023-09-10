@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 /// A list of [`Tags`](Tag) associated with an [`Object`](crate::objects::Object).
 /// Tags can be filtered by valid an invalid tags.
-#[derive(Deserialize, Serialize, Default, Clone, Debug, IntoIterator, Deref, DerefMut, Display)]
+#[derive(Deserialize, Serialize, Default, Clone, Debug, Deref, DerefMut, Display, IntoIterator)]
 #[display(fmt = "{}", "self.0.iter().format(\", \")")]
 pub struct Tags(Vec<Tag>);
 
@@ -31,7 +31,7 @@ impl Tags {
 }
 
 /// A tag associated with an [`Object`](crate::objects::Object).
-#[derive(Deserialize, Serialize, Clone, Debug, Display, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, Display)]
 #[display(fmt = "{}", "self.0.yellow()")]
 pub struct Tag(String);
 
@@ -93,8 +93,8 @@ impl Tag {
     pub fn path(&self) -> Result<&Path> {
         let path = Path::new(&self.0);
         match self {
-            _ if self.is_lua() => Ok(path.strip_prefix("lua/").unwrap()),
-            _ if self.is_xml() => Ok(path.strip_prefix("xml/").unwrap()),
+            _ if self.is_lua() => Ok(path.strip_prefix("lua/")?),
+            _ if self.is_xml() => Ok(path.strip_prefix("xml/")?),
             _ => Err("{self} is not a valid tag".into()),
         }
     }
