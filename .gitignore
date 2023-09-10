@@ -1,4 +1,6 @@
 /target
-/scripts
-
 .vscode/*
+
+# Ignore all folders except src
+/*/
+!src/
