@@ -80,14 +80,8 @@ pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
             // Update lua scripts if the path is a lua file
             match object.valid_lua()? {
                 Some(tag) => {
-                    // If path is a file, only reload objects with that file attached
-                    let full_path = match path.is_dir() {
-                        true => tag.join_path(&path)?,
-                        false => path.clone(),
-                    };
-
-                    if full_path.is_file() && tag == full_path {
-                        object.lua_script = read_file(&full_path)?;
+                    if tag.starts_with(&path) {
+                        object.lua_script = read_file(&tag.path()?)?;
                         info!("updated {object} with tag {tag}");
                     }
                 }
@@ -102,14 +96,8 @@ pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
             // Update xml ui if the path is a xml file
             match object.valid_xml()? {
                 Some(tag) => {
-                    // If path is a file, only reload objects with that file attached
-                    let full_path = match path.is_dir() {
-                        true => tag.join_path(&path)?,
-                        false => path.clone(),
-                    };
-
-                    if full_path.is_file() && tag == full_path {
-                        object.xml_ui = read_file(&full_path)?;
+                    if tag.starts_with(&path) {
+                        object.xml_ui = read_file(&tag.path()?)?;
                         info!("updated {object} with tag {tag}");
                     }
                 }
