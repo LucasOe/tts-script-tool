@@ -181,6 +181,20 @@ fn select_objects(save: Save, message: &str, show_all: bool) -> Result<Objects> 
 /// Overwrite the save file and reload the current save,
 /// the same way it get reloaded when pressing “Save & Play” within the in-game editor.
 fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
+    // Warning if tag an lua script or xml ui are mismatched
+    for object in save.objects.iter() {
+        if let (None, false) = (object.valid_lua()?, object.lua_script.is_empty()) {
+            warn!("{} has a lua script but no valid lua tag", object);
+            #[rustfmt::skip]
+            warn!("If you manually removed the tag, use the detach command to remove the lua script");
+        }
+        if let (None, false) = (object.valid_xml()?, object.xml_ui.is_empty()) {
+            warn!("{} has a xml ui but no valid xml tag", object);
+            #[rustfmt::skip]
+            warn!("If you manually removed the tag, use the detach command to remove the xml ui");
+        }
+    }
+
     // Overwrite the save file with the modified objects
     save.write(api)?;
 
