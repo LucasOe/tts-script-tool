@@ -79,35 +79,29 @@ pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
         for object in save.objects.iter_mut() {
             // Update lua scripts if the path is a lua file
             match object.valid_lua()? {
-                Some(tag) => {
-                    if tag.starts_with(&path) {
-                        object.lua_script = read_file(&tag.path()?)?;
-                        info!("updated {object} with tag {tag}");
-                    }
+                Some(tag) if tag.starts_with(&path) => {
+                    object.lua_script = read_file(&tag.path()?)?;
+                    info!("updated {object} with tag {tag}");
                 }
                 // Remove lua script if the objects has no valid tag
-                None => {
-                    if !object.lua_script.is_empty() {
-                        object.lua_script = "".to_string();
-                        info!("removed lua script from {}", object);
-                    }
+                None if !object.lua_script.is_empty() => {
+                    object.lua_script = "".to_string();
+                    info!("removed lua script from {}", object);
                 }
+                _ => {}
             }
             // Update xml ui if the path is a xml file
             match object.valid_xml()? {
-                Some(tag) => {
-                    if tag.starts_with(&path) {
-                        object.xml_ui = read_file(&tag.path()?)?;
-                        info!("updated {object} with tag {tag}");
-                    }
+                Some(tag) if tag.starts_with(&path) => {
+                    object.xml_ui = read_file(&tag.path()?)?;
+                    info!("updated {object} with tag {tag}");
                 }
                 // Remove xml ui if the objects has no valid tag
-                None => {
-                    if !object.xml_ui.is_empty() {
-                        object.xml_ui = "".to_string();
-                        info!("removed xml ui from {}", object);
-                    }
+                None if !object.xml_ui.is_empty() => {
+                    object.xml_ui = "".to_string();
+                    info!("removed xml ui from {}", object);
                 }
+                _ => {}
             }
         }
     }
