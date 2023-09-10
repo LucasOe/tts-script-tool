@@ -9,7 +9,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Deserialize, Serialize, Default, Clone, Debug, IntoIterator, Deref, DerefMut, Display)]
+#[derive(Deserialize, Serialize, Clone, Debug, Deref, DerefMut, Display, IntoIterator)]
 #[display(fmt = "{}", "self.0.iter().format(\", \")")]
 pub struct Objects(Vec<Object>);
 

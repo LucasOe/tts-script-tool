@@ -10,7 +10,7 @@ use serde_json::Value;
 use tts_external_api::ExternalEditorApi;
 
 /// A representation of the Tabletop Simulator [Save File Format](https://kb.tabletopsimulator.com/custom-content/save-file-format/).
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Save {
     #[serde(rename = "SaveName")]
     pub name: String,
