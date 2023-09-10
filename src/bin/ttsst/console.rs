@@ -12,17 +12,6 @@ use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 
-trait PathExt {
-    fn strip_current_dir(&self) -> Result<PathBuf>;
-}
-
-impl PathExt for PathBuf {
-    fn strip_current_dir(&self) -> Result<PathBuf> {
-        let path = self.strip_prefix(std::env::current_dir()?)?;
-        Ok(PathBuf::from(".\\").join(path))
-    }
-}
-
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
 pub fn start(api: ExternalEditorApi, path: Option<Vec<PathBuf>>) -> Result<()> {
