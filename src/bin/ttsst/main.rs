@@ -14,29 +14,28 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Verbosity level - specify up to 2 times to get more detailed output.
+    /// Verbosity level (use up to 2 times for more detailed output)
     #[clap(short = 'v', long = "verbose", action = clap::ArgAction::Count, global = true)]
     pub verbosity: u8,
 }
 
 #[derive(Args, Debug)]
 pub struct Guids {
-    /// Optional: The guid(s) of the object(s) the script should be attached to
+    /// Optional: The GUID(s) of the object(s) the Lua script or XML UI should be attached to
     #[arg(value_name = "GUID(s)")]
     #[arg(value_parser = parser::guid)]
     guids: Option<Vec<String>>,
 
-    /// Show HandTriggers in the list of objects, if no guids are provided
+    /// Show hidden objects like Zones in the selection prompt, if no GUIDs are provided
     #[arg(short, long)]
     all: bool,
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Attach a lua script or xml ui to object(s)
+    /// Attach Lua scripts or XML UI to object(s)
     Attach {
-        /// Path to the file that should be attached.
-        /// ttsst will use the current working directory as a root.
+        /// Path to the Lua script or XML UI that should be attached
         #[arg(value_name = "FILE")]
         #[arg(value_parser = parser::path_is_file)]
         path: PathBuf,
@@ -45,24 +44,24 @@ enum Commands {
         guids: Guids,
     },
 
-    /// Detach lua script and xml ui from object(s)
+    /// Detach Lua scripts and XML UI from object(s)
     Detach {
         #[command(flatten)]
         guids: Guids,
     },
 
-    /// Reload path(s)
+    /// Reload script path(s)
     Reload {
-        /// The path(s) that will be reloaded
+        /// The script path(s) to reload
         #[arg(value_name = "PATH(S)")]
         #[arg(value_parser = parser::path_exists, default_value = ".\\")]
         paths: Vec<PathBuf>,
     },
 
-    /// Mirror messages from Tabletop Simulator to the console
+    /// Mirror Tabletop Simulator messages to the console
     Console,
 
-    /// Watch path(s) and reload on change
+    /// Watch script path(s) and reload on change
     Watch {
         /// The path(s) that will be watched for changes
         #[arg(value_name = "PATH(S)")]
@@ -70,7 +69,7 @@ enum Commands {
         paths: Vec<PathBuf>,
     },
 
-    /// Backup current save as a json file
+    /// Create a backup of the current save as a JSON file
     Backup {
         /// Path to save location
         #[arg(value_parser = parser::path_is_json)]
