@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::Guids;
 use colored::Colorize;
+use derive_more::Display;
 use itertools::Itertools;
 use log::*;
 use tts_external_api::ExternalEditorApi;
@@ -247,7 +248,25 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
 
     match paths.len() {
         0 | 1 => Ok(paths.get(0).map(|path| path.to_path_buf())),
-        _ => Err("multiple files for the global script exist".into()),
+        _ => select_paths(&paths).map(Option::Some),
+    }
+}
+
+/// Shows a multi selection prompt of `paths`
+fn select_paths<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
+    #[derive(Display)]
+    #[display(fmt = "'{}'", "self.0.as_ref().display()")]
+    struct DisplayPath<P: AsRef<Path>>(P);
+
+    // Wrap `paths` in `DisplayPath` so they can be displayed by the inquire prompt
+    let display_paths = paths
+        .iter()
+        .map(|path| DisplayPath(path))
+        .collect::<Vec<_>>();
+
+    match inquire::Select::new("Select a Global file to use:", display_paths).prompt() {
+        Ok(path) => Ok(path.0.as_ref().to_path_buf()),
+        Err(err) => Err(err.into()),
     }
 }
 
