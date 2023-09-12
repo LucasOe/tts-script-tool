@@ -294,7 +294,7 @@ impl<P: AsRef<Path> + Clone> Reduce for Vec<P> {
 }
 
 /// Reads a file from the path and replaces every occurrence of `\t` with spaces.
-fn read_file(path: &Path) -> Result<String> {
+fn read_file<P: AsRef<Path>>(path: P) -> Result<String> {
     match fs::read_to_string(path) {
         Ok(content) => Ok(content.replace('\t', "    ")),
         Err(err) => Err(err.into()),
