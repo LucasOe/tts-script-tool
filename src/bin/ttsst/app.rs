@@ -141,7 +141,7 @@ fn get_objects(api: &ExternalEditorApi, guids: Guids, mode: Mode) -> Result<Obje
 /// If `guids` only contains existing objects, a vec with the savestate of those objects will be returned.
 fn validate_guids(save: Save, guids: Vec<String>) -> Result<Objects> {
     guids
-        .into_iter()
+        .iter()
         .map(|guid| save.objects.clone().find_object(&guid))
         .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
 }
@@ -203,10 +203,10 @@ fn update_global_files<P: AsRef<Path>>(save: &mut Save, paths: &[P]) -> Result<(
     const GLOBAL_XML: &[&str] = &["Global.xml"];
 
     // Filter out duplicates
-    let unique_paths: Vec<_> = paths
-        .into_iter()
-        .unique_by(|p| p.as_ref().to_path_buf())
-        .collect();
+    let unique_paths = paths
+        .iter()
+        .unique_by(|path| path.as_ref().to_path_buf())
+        .collect_vec();
 
     if let Some(path) = get_global_path(&unique_paths, GLOBAL_LUA)? {
         let file = read_file(&path)?;
@@ -247,10 +247,10 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
 ) -> Result<Option<PathBuf>> {
     // Returns a list of joined `paths` and `files` that exist
     let joined_paths = paths
-        .into_iter()
+        .iter()
         .flat_map(|path| {
             files
-                .into_iter()
+                .iter()
                 .filter_map(|file| match path.as_ref().is_dir() {
                     // If path is a dir, join `file`
                     true => Some(path.as_ref().join(file.as_ref())),
@@ -262,9 +262,9 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
                     false => None,
                 })
                 .filter(|path| path.exists())
-                .collect::<Vec<_>>()
+                .collect_vec()
         })
-        .collect::<Vec<_>>();
+        .collect_vec();
 
     match joined_paths.len() {
         0 | 1 => Ok(joined_paths.get(0).map(ToOwned::to_owned)),
@@ -279,10 +279,7 @@ fn select_paths<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
     struct DisplayPath<P: AsRef<Path>>(P);
 
     // Wrap `paths` in `DisplayPath` so they can be displayed by the inquire prompt
-    let display_paths = paths
-        .iter()
-        .map(|path| DisplayPath(path))
-        .collect::<Vec<_>>();
+    let display_paths = paths.iter().map(|path| DisplayPath(path)).collect_vec();
 
     match inquire::Select::new("Select a Global file to use:", display_paths).prompt() {
         Ok(path) => Ok(path.0.as_ref().to_path_buf()),

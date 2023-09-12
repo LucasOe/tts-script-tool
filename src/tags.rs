@@ -20,7 +20,7 @@ impl From<Vec<Tag>> for Tags {
 
 impl FromIterator<Tag> for Tags {
     fn from_iter<I: IntoIterator<Item = Tag>>(iter: I) -> Self {
-        Tags(iter.into_iter().collect::<Vec<Tag>>())
+        Tags(iter.into_iter().collect_vec())
     }
 }
 
