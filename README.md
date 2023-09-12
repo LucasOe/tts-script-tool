@@ -44,6 +44,8 @@ If you make changes to an attached file and want them to update in-game, execute
 If `<Path>` is a directory, all files within it will be reloaded. If `<Path>` is a file, only that file will be reloaded.
 By default, **ttsst** uses the current working directory as the path.
 
+*ttsst* will search for `Global.lua`, `Global.ttslua` and `Global.xml` files inside `<Path>` and reload them.
+
 ### Detaching
 
 To remove all Lua and XML tags and scripts from one or more objects, use the command: `ttsst detach <GUID(s)>.`
