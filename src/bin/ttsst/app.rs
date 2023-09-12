@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::Guids;
 use colored::Colorize;
+use itertools::Itertools;
 use log::*;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
@@ -75,7 +76,7 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
 pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
     let mut save = Save::read(api)?;
 
-    for path in &paths {
+    for path in &paths.reduce() {
         for object in save.objects.iter_mut() {
             // Update lua scripts if the path is a lua file
             match object.valid_lua()? {
@@ -240,6 +241,29 @@ fn get_global_path(path: &Path, files: &[&str]) -> Result<Option<PathBuf>> {
     match paths.len() {
         0 | 1 => Ok(paths.get(0).cloned()),
         _ => Err("multiple files for the global script exist".into()),
+    }
+}
+
+trait Reduce {
+    /// Filters and deduplicates the collection of paths, returning a new collection.
+    ///
+    /// This method removes duplicate paths based on their logical content and ensures that
+    /// subfolders are not included if a parent folder is present in the collection.
+    fn reduce(&self) -> Self;
+}
+
+impl<P: AsRef<Path> + Clone> Reduce for Vec<P> {
+    fn reduce(&self) -> Self {
+        self.iter()
+            .unique_by(|path| path.as_ref().to_path_buf())
+            .filter(|&this| {
+                !self.iter().any(|other| {
+                    let paths = (this.as_ref(), other.as_ref());
+                    paths.0 != paths.1 && paths.0.starts_with(paths.1)
+                })
+            })
+            .cloned()
+            .collect()
     }
 }
 
