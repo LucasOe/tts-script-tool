@@ -122,7 +122,8 @@ pub fn backup(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 
     // Print information about the file
     let save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap();
-    info!("save '{}' as '{}'", save_name, path.display());
+    #[rustfmt::skip]
+    info!("save '{}' as '{}'", save_name.yellow(), path.to_slash_lossy().yellow());
 
     Ok(())
 }
@@ -275,7 +276,7 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
 /// Shows a multi selection prompt of `paths`
 fn select_paths<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
     #[derive(Display)]
-    #[display(fmt = "'{}'", "self.0.as_ref().display()")]
+    #[display(fmt = "'{}'", "self.0.as_ref().to_slash_lossy().yellow()")]
     struct DisplayPath<P: AsRef<Path>>(P);
 
     // Wrap `paths` in `DisplayPath` so they can be displayed by the inquire prompt
