@@ -210,41 +210,31 @@ fn update_global_files<P: AsRef<Path>>(save: &mut Save, paths: &[P]) -> Result<(
 
     if let Some(path) = get_global_path(&unique_paths, GLOBAL_LUA)? {
         let file = read_file(&path)?;
-        save.lua_script = match file.is_empty() {
-            true => {
-                warn!("'{}' is empty", path.display());
-                "--[[ Lua code. See documentation: https://api.tabletopsimulator.com/ --]]"
-                    .to_string()
-            }
-            false => {
-                info!(
-                    "updated {} using '{}'",
-                    "Global Lua".yellow(),
-                    path.to_slash_lossy().yellow()
-                );
-                file
-            }
-        }
+        let lua_script = match file.is_empty() {
+            #[rustfmt::skip]
+            true => "--[[ Lua code. See documentation: https://api.tabletopsimulator.com/ --]]".to_string(),
+            false => file,
+        };
+        if save.lua_script != lua_script {
+            #[rustfmt::skip]
+            info!("updated {} using '{}'", "Global Lua".yellow(), path.to_slash_lossy().yellow());
+            save.lua_script = lua_script;
+        };
     };
 
     // Update xml_ui
     if let Some(path) = get_global_path(&unique_paths, GLOBAL_XML)? {
         let file: String = read_file(&path)?;
-        save.xml_ui = match file.is_empty() {
-            true => {
-                warn!("'{}' is empty", path.display());
-                "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->"
-                    .to_string()
-            }
-            false => {
-                info!(
-                    "updated {} using '{}'",
-                    "Global UI".yellow(),
-                    path.to_slash_lossy().yellow()
-                );
-                file
-            }
-        }
+        let xml_ui = match file.is_empty() {
+            #[rustfmt::skip]
+            true => "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->".to_string(),
+            false => file,
+        };
+        if save.xml_ui != xml_ui {
+            #[rustfmt::skip]
+            info!("updated {} using '{}'", "Global UI".yellow(), path.to_slash_lossy().yellow());
+            save.xml_ui = xml_ui;
+        };
     };
 
     Ok(())
