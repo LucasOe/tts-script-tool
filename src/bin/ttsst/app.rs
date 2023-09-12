@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -6,6 +7,7 @@ use colored::Colorize;
 use derive_more::Display;
 use itertools::Itertools;
 use log::*;
+use path_slash::PathExt;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 use ttsst::{Objects, Save, Tag};
@@ -206,24 +208,43 @@ fn update_global_files<P: AsRef<Path>>(save: &mut Save, paths: &[P]) -> Result<(
         .unique_by(|p| p.as_ref().to_path_buf())
         .collect();
 
-    // Update lua_script
     if let Some(path) = get_global_path(&unique_paths, GLOBAL_LUA)? {
         let file = read_file(&path)?;
         save.lua_script = match file.is_empty() {
-            #[rustfmt::skip]
-            true => "--[[ Lua code. See documentation: https://api.tabletopsimulator.com/ --]]".to_string(),
-            false => file,
-        };
+            true => {
+                warn!("'{}' is empty", path.display());
+                "--[[ Lua code. See documentation: https://api.tabletopsimulator.com/ --]]"
+                    .to_string()
+            }
+            false => {
+                info!(
+                    "updated {} using '{}'",
+                    "Global Lua".yellow(),
+                    path.to_slash_lossy().yellow()
+                );
+                file
+            }
+        }
     };
 
     // Update xml_ui
     if let Some(path) = get_global_path(&unique_paths, GLOBAL_XML)? {
         let file: String = read_file(&path)?;
         save.xml_ui = match file.is_empty() {
-            #[rustfmt::skip]
-            true => "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->".to_string(),
-            false => file,
-        };
+            true => {
+                warn!("'{}' is empty", path.display());
+                "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->"
+                    .to_string()
+            }
+            false => {
+                info!(
+                    "updated {} using '{}'",
+                    "Global UI".yellow(),
+                    path.to_slash_lossy().yellow()
+                );
+                file
+            }
+        }
     };
 
     Ok(())
@@ -235,19 +256,28 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
     files: &[T],
 ) -> Result<Option<PathBuf>> {
     // Returns a list of joined `paths` and `files` that exist
-    let joined_paths: Vec<_> = paths
+    let joined_paths = paths
         .into_iter()
         .flat_map(|path| {
             files
                 .into_iter()
-                .map(|file| path.as_ref().join(file.as_ref()))
+                .filter_map(|file| match path.as_ref().is_dir() {
+                    // If path is a dir, join `file`
+                    true => Some(path.as_ref().join(file.as_ref())),
+                    // If path ends with `file`, it is a global file
+                    false if path.as_ref().file_name() == Some(OsStr::new(file.as_ref())) => {
+                        Some(path.as_ref().to_path_buf())
+                    }
+                    // if path is a file that doesn't end with `file`, ignore it
+                    false => None,
+                })
                 .filter(|path| path.exists())
                 .collect::<Vec<_>>()
         })
-        .collect();
+        .collect::<Vec<_>>();
 
     match joined_paths.len() {
-        0 | 1 => Ok(joined_paths.get(0).map(|path| path.to_path_buf())),
+        0 | 1 => Ok(joined_paths.get(0).map(ToOwned::to_owned)),
         _ => select_paths(&joined_paths).map(Option::Some),
     }
 }
