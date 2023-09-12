@@ -235,7 +235,7 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
     files: &[T],
 ) -> Result<Option<PathBuf>> {
     // Returns a list of joined `paths` and `files` that exist
-    let paths: Vec<_> = paths
+    let joined_paths: Vec<_> = paths
         .into_iter()
         .flat_map(|path| {
             files
@@ -246,9 +246,9 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
         })
         .collect();
 
-    match paths.len() {
-        0 | 1 => Ok(paths.get(0).map(|path| path.to_path_buf())),
-        _ => select_paths(&paths).map(Option::Some),
+    match joined_paths.len() {
+        0 | 1 => Ok(joined_paths.get(0).map(|path| path.to_path_buf())),
+        _ => select_paths(&joined_paths).map(Option::Some),
     }
 }
 
