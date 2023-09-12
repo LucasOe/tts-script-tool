@@ -38,15 +38,19 @@ fn console(api: ExternalEditorApi, watching: bool) -> JoinHandle<Result<()>> {
                 }
             }
 
-            // Print Answer
             // Note: When reloading there isn't a strict order of messages sent from the server
-            match serde_json::from_str(&buffer)? {
-                Answer::AnswerPrint(answer) => println!("{}", answer.message.bright_white()),
-                Answer::AnswerError(answer) => println!("{}", answer.error_message_prefix.red()),
+            let message = match serde_json::from_str(&buffer)? {
+                Answer::AnswerPrint(answer) => Some(answer.message.bright_white()),
+                Answer::AnswerError(answer) => Some(answer.error_message_prefix.red()),
                 // When calling `crate::app::reload` in the watch thread,
                 // reloading and writing to the save file is causing multiple prints.
-                Answer::AnswerReload(_) if !watching => println!("{}", "Loading complete.".green()),
-                _ => {}
+                Answer::AnswerReload(_) if !watching => Some("Loading complete.".green()),
+                _ => None,
+            };
+
+            if let Some(msg) = message {
+                let time = chrono::Local::now().format("%H:%M:%S").to_string();
+                println!("[{}] {}", time.bright_white(), msg);
             }
         }
     })
