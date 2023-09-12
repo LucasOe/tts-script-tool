@@ -107,12 +107,7 @@ pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
         }
     }
 
-    // Use the first path that is a dir to search for global files
-    // TODO: Support Global files in subdirectories: Add `-g` flag or search recursively
-    if let Some(path) = &paths.into_iter().find(|path| path.is_dir()) {
-        update_global(&mut save, path)?;
-    }
-
+    update_global_files(&mut save, &paths)?;
     update_save(api, &save)?;
     Ok(())
 }
@@ -200,12 +195,18 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
 ///
 /// If the file is empty, this function will use a placeholder text to avoid writing an empty string.
 /// See [`Save::write`].
-fn update_global(save: &mut Save, path: &Path) -> Result<()> {
+fn update_global_files<P: AsRef<Path>>(save: &mut Save, paths: &[P]) -> Result<()> {
     const GLOBAL_LUA: &[&str] = &["Global.lua", "Global.ttslua"];
     const GLOBAL_XML: &[&str] = &["Global.xml"];
 
+    // Filter out duplicates
+    let unique_paths: Vec<_> = paths
+        .into_iter()
+        .unique_by(|p| p.as_ref().to_path_buf())
+        .collect();
+
     // Update lua_script
-    if let Some(path) = get_global_path(path, GLOBAL_LUA)? {
+    if let Some(path) = get_global_path(&unique_paths, GLOBAL_LUA)? {
         let file = read_file(&path)?;
         save.lua_script = match file.is_empty() {
             #[rustfmt::skip]
@@ -215,7 +216,7 @@ fn update_global(save: &mut Save, path: &Path) -> Result<()> {
     };
 
     // Update xml_ui
-    if let Some(path) = get_global_path(path, GLOBAL_XML)? {
+    if let Some(path) = get_global_path(&unique_paths, GLOBAL_XML)? {
         let file: String = read_file(&path)?;
         save.xml_ui = match file.is_empty() {
             #[rustfmt::skip]
@@ -227,19 +228,25 @@ fn update_global(save: &mut Save, path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Returns a path to a global script, if `paths` only contains a single existing file inside the directory.
-/// If it contains no existing files it returns [`None`].
-/// If `files` contains multiple existing files, this function returns an [`Error::Msg`].
-fn get_global_path(path: &Path, files: &[&str]) -> Result<Option<PathBuf>> {
-    // Get a vec of existing file paths for `files` in the `path` directory.
-    let paths: Vec<PathBuf> = files
-        .iter()
-        .map(|file| Path::new(path).join(file))
-        .filter(|path| path.exists())
+/// Returns a path to a global script, by joining `paths` and `files`.
+fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
+    paths: &[P],
+    files: &[T],
+) -> Result<Option<PathBuf>> {
+    // Returns a list of joined `paths` and `files` that exist
+    let paths: Vec<_> = paths
+        .into_iter()
+        .flat_map(|path| {
+            files
+                .into_iter()
+                .map(|file| path.as_ref().join(file.as_ref()))
+                .filter(|path| path.exists())
+                .collect::<Vec<_>>()
+        })
         .collect();
 
     match paths.len() {
-        0 | 1 => Ok(paths.get(0).cloned()),
+        0 | 1 => Ok(paths.get(0).map(|path| path.to_path_buf())),
         _ => Err("multiple files for the global script exist".into()),
     }
 }
