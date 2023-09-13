@@ -1,13 +1,13 @@
 use std::{collections::HashMap, path::PathBuf};
 use std::{fs, io};
 
-use crate::error::Result;
-use crate::objects::Objects;
-
 use log::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tts_external_api::ExternalEditorApi;
+
+use crate::error::Result;
+use crate::objects::Objects;
 
 /// A representation of the Tabletop Simulator [Save File Format](https://kb.tabletopsimulator.com/custom-content/save-file-format/).
 #[derive(Deserialize, Serialize, Debug)]

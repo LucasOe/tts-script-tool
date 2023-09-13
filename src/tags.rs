@@ -1,10 +1,11 @@
-use crate::error::{Error, Result};
 use colored::*;
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use itertools::Itertools;
 use path_slash::PathExt;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+
+use crate::error::{Error, Result};
 
 /// A list of [`Tags`](Tag) associated with an [`Object`](crate::objects::Object).
 /// Tags can be filtered by valid an invalid tags.

@@ -3,10 +3,11 @@ mod console;
 mod logger;
 mod parser;
 
-use crate::logger::ConsoleLogger;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 use ttsst::error::Result;
+
+use crate::logger::ConsoleLogger;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -15,7 +16,8 @@ struct Cli {
     command: Commands,
 
     /// Verbosity level (use up to 2 times for more detailed output)
-    #[clap(short = 'v', long = "verbose", action = clap::ArgAction::Count, global = true)]
+    #[arg(short = 'v', long = "verbose", global = true)]
+    #[arg(action = clap::ArgAction::Count)]
     pub verbosity: u8,
 }
 
@@ -29,6 +31,14 @@ pub struct Guids {
     /// Show hidden objects like Zones in the selection prompt, if no GUIDs are provided
     #[arg(short, long)]
     all: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct ReloadArgs {
+    /// Reload a single object
+    #[arg(short, long, value_name = "GUID")]
+    #[arg(value_parser = parser::guid)]
+    guid: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -56,6 +66,9 @@ enum Commands {
         #[arg(value_name = "PATH(S)")]
         #[arg(value_parser = parser::path_exists, default_value = ".\\")]
         paths: Vec<PathBuf>,
+
+        #[command(flatten)]
+        args: ReloadArgs,
     },
 
     /// Mirror Tabletop Simulator messages to the console
@@ -98,7 +111,7 @@ fn run(args: Cli) -> Result<()> {
     match args.command {
         Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
         Commands::Detach { guids } => app::detach(&api, guids)?,
-        Commands::Reload { paths } => app::reload(&api, paths)?,
+        Commands::Reload { paths, args } => app::reload(&api, paths, args)?,
         Commands::Console => console::start(api, None)?,
         Commands::Watch { paths } => console::start(api, Some(paths))?,
         Commands::Backup { path } => app::backup(&api, path)?,

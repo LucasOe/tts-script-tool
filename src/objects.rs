@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use crate::tags::Tags;
-use crate::{error::Result, Tag};
-
 use colored::*;
 use derive_more::{Deref, DerefMut, Display, IntoIterator};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use crate::tags::Tags;
+use crate::{error::Result, Tag};
 
 #[derive(Deserialize, Serialize, Clone, Debug, Deref, DerefMut, Display, IntoIterator)]
 #[display(fmt = "{}", "self.0.iter().format(\", \")")]
@@ -41,10 +41,10 @@ impl Objects {
     }
 
     /// Searches for an object that has the same guid.
-    pub fn find_object(self, guid: &str) -> Result<Object> {
+    pub fn find_object<T: AsRef<str>>(self, guid: T) -> Result<Object> {
         self.into_iter()
-            .find(|object| object.guid == guid)
-            .ok_or(format!("{} does not exist", guid.yellow()).into())
+            .find(|object| object.guid == guid.as_ref())
+            .ok_or(format!("{} does not exist", guid.as_ref().yellow()).into())
     }
 
     /// Filter out `HandTrigger`, `FogOfWar` and `FogOfWarTrigger` objects.

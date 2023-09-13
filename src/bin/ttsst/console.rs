@@ -12,6 +12,8 @@ use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
 
+use crate::{app, ReloadArgs};
+
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
 pub fn start(api: ExternalEditorApi, path: Option<Vec<PathBuf>>) -> Result<()> {
@@ -77,7 +79,7 @@ fn watch(paths: Vec<PathBuf>) -> JoinHandle<Result<()>> {
             match result {
                 Ok(events) => {
                     let paths = events.into_iter().map(|event| event.path).collect();
-                    crate::app::reload(&api, paths)?
+                    app::reload(&api, paths, ReloadArgs { guid: None })?
                 }
                 Err(err) => error!("{}", err),
             }
