@@ -2,7 +2,6 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::Guids;
 use colored::Colorize;
 use derive_more::Display;
 use itertools::Itertools;
@@ -10,7 +9,9 @@ use log::*;
 use path_slash::PathExt;
 use tts_external_api::ExternalEditorApi;
 use ttsst::error::Result;
-use ttsst::{Objects, Save, Tag};
+use ttsst::{Object, Objects, Save, Tag};
+
+use crate::{Guids, ReloadArgs};
 
 pub enum Mode {
     Attach,
@@ -76,42 +77,57 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>) -> Result<()> {
+pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>, args: ReloadArgs) -> Result<()> {
     let mut save = Save::read(api)?;
 
     for path in &paths.reduce() {
-        for object in save.objects.iter_mut() {
-            // Update lua scripts if the path is a lua file
-            match object.valid_lua()? {
-                Some(tag) if tag.starts_with(&path) => {
-                    object.lua_script = read_file(&tag.path()?)?;
-                    info!("updated {object}");
-                }
-                // Remove lua script if the objects has no valid tag
-                None if !object.lua_script.is_empty() => {
-                    object.lua_script = "".to_string();
-                    info!("removed lua script from {}", object);
-                }
-                _ => {}
+        match args.guid {
+            Some(ref guid) => {
+                let mut object = save.objects.clone().find_object(guid)?;
+                reload_object(&mut object, path)?;
             }
-            // Update xml ui if the path is a xml file
-            match object.valid_xml()? {
-                Some(tag) if tag.starts_with(&path) => {
-                    object.xml_ui = read_file(&tag.path()?)?;
-                    info!("updated {object}");
+            None => {
+                for object in save.objects.iter_mut() {
+                    reload_object(object, path)?;
                 }
-                // Remove xml ui if the objects has no valid tag
-                None if !object.xml_ui.is_empty() => {
-                    object.xml_ui = "".to_string();
-                    info!("removed xml ui from {}", object);
-                }
-                _ => {}
             }
-        }
+        };
     }
 
     update_global_files(&mut save, &paths)?;
     update_save(api, &save)?;
+    Ok(())
+}
+
+/// Reload the lua script and xml ui of an `object`, if its tag matches the `path`
+fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<()> {
+    // Update lua scripts if the path is a lua file
+    match object.valid_lua()? {
+        Some(tag) if tag.starts_with(&path) => {
+            object.lua_script = read_file(&tag.path()?)?;
+            info!("updated {object}");
+        }
+        // Remove lua script if the objects has no valid tag
+        None if !object.lua_script.is_empty() => {
+            object.lua_script = "".to_string();
+            info!("removed lua script from {}", object);
+        }
+        _ => {}
+    };
+    // Update xml ui if the path is a xml file
+    match object.valid_xml()? {
+        Some(tag) if tag.starts_with(&path) => {
+            object.xml_ui = read_file(&tag.path()?)?;
+            info!("updated {object}");
+        }
+        // Remove xml ui if the objects has no valid tag
+        None if !object.xml_ui.is_empty() => {
+            object.xml_ui = "".to_string();
+            info!("removed xml ui from {}", object);
+        }
+        _ => {}
+    };
+
     Ok(())
 }
 
