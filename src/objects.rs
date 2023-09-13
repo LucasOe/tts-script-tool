@@ -41,8 +41,15 @@ impl Objects {
     }
 
     /// Searches for an object that has the same guid.
-    pub fn find_object<T: AsRef<str>>(self, guid: T) -> Result<Object> {
-        self.into_iter()
+    pub fn find_object<T: AsRef<str>>(&self, guid: T) -> Result<&Object> {
+        self.iter()
+            .find(|object| object.guid == guid.as_ref())
+            .ok_or(format!("{} does not exist", guid.as_ref().yellow()).into())
+    }
+
+    /// Searches for an object that has the same guid.
+    pub fn find_object_mut<T: AsRef<str>>(&mut self, guid: T) -> Result<&mut Object> {
+        self.iter_mut()
             .find(|object| object.guid == guid.as_ref())
             .ok_or(format!("{} does not exist", guid.as_ref().yellow()).into())
     }
