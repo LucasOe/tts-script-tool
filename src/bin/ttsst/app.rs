@@ -83,8 +83,8 @@ pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>, args: ReloadArgs) ->
     for path in &paths.reduce() {
         match args.guid {
             Some(ref guid) => {
-                let mut object = save.objects.clone().find_object(guid)?;
-                reload_object(&mut object, path)?;
+                let object = save.objects.find_object_mut(guid)?;
+                reload_object(object, path)?;
             }
             None => {
                 for object in save.objects.iter_mut() {
@@ -149,17 +149,17 @@ pub fn backup(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 fn get_objects(api: &ExternalEditorApi, guids: Guids, mode: Mode) -> Result<Objects> {
     let save = Save::read(api)?;
     match guids.guids {
-        Some(guids) => validate_guids(save, guids),
+        Some(guids) => find_objects(save, guids),
         None => select_objects(save, mode.msg(), guids.all),
     }
 }
 
 /// Once an `Result::Err` is found, the iteration will terminate and return the result.
 /// If `guids` only contains existing objects, a vec with the savestate of those objects will be returned.
-fn validate_guids(save: Save, guids: Vec<String>) -> Result<Objects> {
+fn find_objects(save: Save, guids: Vec<String>) -> Result<Objects> {
     guids
         .iter()
-        .map(|guid| save.objects.clone().find_object(&guid))
+        .map(|guid| save.objects.find_object(guid).cloned())
         .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
 }
 
