@@ -33,7 +33,7 @@ pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Guids) -> Result<()
     let mut objects = get_objects(api, guids, Mode::Attach)?;
 
     let tag = Tag::try_from(path.as_path())?;
-    let file = read_file(&path)?;
+    let file = read_file(path)?;
     for object in objects.iter_mut() {
         // Add lua tag to objects
         if tag.is_lua() {
@@ -104,7 +104,7 @@ fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<()> {
     // Update lua scripts if the path is a lua file
     match object.valid_lua()? {
         Some(tag) if tag.starts_with(&path) => {
-            object.lua_script = read_file(&tag.path()?)?;
+            object.lua_script = read_file(tag.path()?)?;
             info!("updated {object}");
         }
         // Remove lua script if the objects has no valid tag
@@ -117,7 +117,7 @@ fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<()> {
     // Update xml ui if the path is a xml file
     match object.valid_xml()? {
         Some(tag) if tag.starts_with(&path) => {
-            object.xml_ui = read_file(&tag.path()?)?;
+            object.xml_ui = read_file(tag.path()?)?;
             info!("updated {object}");
         }
         // Remove xml ui if the objects has no valid tag
@@ -296,7 +296,7 @@ fn select_paths<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
     struct DisplayPath<P: AsRef<Path>>(P);
 
     // Wrap `paths` in `DisplayPath` so they can be displayed by the inquire prompt
-    let display_paths = paths.iter().map(|path| DisplayPath(path)).collect_vec();
+    let display_paths = paths.iter().map(DisplayPath).collect_vec();
 
     match inquire::Select::new("Select a Global file to use:", display_paths).prompt() {
         Ok(path) => Ok(path.0.as_ref().to_path_buf()),
