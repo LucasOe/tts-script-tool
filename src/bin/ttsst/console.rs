@@ -5,6 +5,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use colored::*;
+use debounce::thread::EventDebouncer;
 use log::*;
 use notify::{self, RecursiveMode};
 use notify_debouncer_mini::{self as debouncer};
@@ -41,19 +42,23 @@ fn console(api: ExternalEditorApi, watching: bool) -> JoinHandle<Result<()>> {
             }
 
             // Note: When reloading there isn't a strict order of messages sent from the server
-            let message = match serde_json::from_str(&buffer)? {
-                Answer::AnswerPrint(answer) => Some(answer.message.bright_white()),
-                Answer::AnswerError(answer) => Some(answer.error_message_prefix.red()),
-                // When calling `crate::app::reload` in the watch thread,
-                // reloading and writing to the save file is causing multiple prints.
-                Answer::AnswerReload(_) if !watching => Some("Loading complete.".green()),
-                _ => None,
-            };
+            // I have no idea why debouncing the messages works, but for some reason that fixed the order
+            let debouncer = EventDebouncer::new(Duration::from_millis(50), move |data: String| {
+                let message = match serde_json::from_str(&data).unwrap() {
+                    Answer::AnswerPrint(answer) => Some(answer.message.bright_white()),
+                    Answer::AnswerError(answer) => Some(answer.error_message_prefix.red()),
+                    // When calling `crate::app::reload` in the watch thread,
+                    // reloading and writing to the save file is causing multiple prints.
+                    Answer::AnswerReload(_) if !watching => Some("Loading complete.".green()),
+                    _ => None,
+                };
 
-            if let Some(msg) = message {
-                let time = chrono::Local::now().format("%H:%M:%S").to_string();
-                println!("[{}] {}", time.bright_white(), msg);
-            }
+                if let Some(msg) = message {
+                    let time = chrono::Local::now().format("%H:%M:%S").to_string();
+                    println!("[{}] {}", time.bright_white(), msg);
+                };
+            });
+            debouncer.put(buffer);
         }
     })
 }
@@ -78,7 +83,10 @@ fn watch(paths: Vec<PathBuf>) -> JoinHandle<Result<()>> {
         while let Ok(result) = rx.recv() {
             match result {
                 Ok(events) => {
-                    let paths = events.into_iter().map(|event| event.path).collect();
+                    let paths = events
+                        .into_iter()
+                        .filter_map(|event| event.path.strip_current_dir().ok())
+                        .collect();
                     app::reload(&api, paths, ReloadArgs { guid: None })?
                 }
                 Err(err) => error!("{}", err),
@@ -87,4 +95,15 @@ fn watch(paths: Vec<PathBuf>) -> JoinHandle<Result<()>> {
 
         Ok(())
     })
+}
+
+trait StripCurrentDir {
+    fn strip_current_dir(&self) -> Result<PathBuf>;
+}
+
+impl StripCurrentDir for PathBuf {
+    fn strip_current_dir(&self) -> Result<PathBuf> {
+        let path = self.strip_prefix(std::env::current_dir()?)?;
+        Ok(PathBuf::from(".\\").join(path))
+    }
 }
