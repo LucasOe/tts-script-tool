@@ -43,7 +43,7 @@ fn console(api: ExternalEditorApi, watching: bool) -> JoinHandle<Result<()>> {
 
             // Note: When reloading there isn't a strict order of messages sent from the server
             // I have no idea why debouncing the messages works, but for some reason that fixed the order
-            let debouncer = EventDebouncer::new(Duration::from_millis(50), move |data: String| {
+            let debouncer = EventDebouncer::new(Duration::from_millis(10), move |data: String| {
                 let message = match serde_json::from_str(&data).unwrap() {
                     Answer::AnswerPrint(answer) => Some(answer.message.bright_white()),
                     Answer::AnswerError(answer) => Some(answer.error_message_prefix.red()),
