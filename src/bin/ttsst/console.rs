@@ -85,8 +85,10 @@ fn watch(paths: Vec<PathBuf>) -> JoinHandle<Result<()>> {
                 Ok(events) => {
                     let paths = events
                         .into_iter()
+                        .filter(|event| event.kind == debouncer::DebouncedEventKind::Any)
                         .filter_map(|event| event.path.strip_current_dir().ok())
                         .collect();
+
                     app::reload(&api, paths, ReloadArgs { guid: None })?
                 }
                 Err(err) => error!("{}", err),
