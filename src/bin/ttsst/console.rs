@@ -5,7 +5,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use colored::*;
-use debounce::thread::EventDebouncer;
+use debounce::EventDebouncer;
 use log::*;
 use notify::{self, RecursiveMode};
 use notify_debouncer_mini::{self as debouncer};
@@ -27,6 +27,15 @@ pub fn start(api: ExternalEditorApi, path: Option<Vec<PathBuf>>) -> Result<()> {
     Err("console loop was aborted".into())
 }
 
+struct ComparableAnswer(Answer);
+
+impl PartialEq for ComparableAnswer {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare the Enum variant
+        std::mem::discriminant(&self.0) == std::mem::discriminant(&other.0)
+    }
+}
+
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
 fn console(api: ExternalEditorApi, watching: bool) -> JoinHandle<Result<()>> {
@@ -34,33 +43,53 @@ fn console(api: ExternalEditorApi, watching: bool) -> JoinHandle<Result<()>> {
         loop {
             // Forward the message to the TcpStream on port 39997 if a connection exists
             let buffer = api.read_string();
-            if watching {
-                if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
-                    stream.write_all(buffer.as_bytes())?;
-                    stream.flush()?;
-                }
-            }
+            let message: Answer = serde_json::from_str(&buffer)?;
 
             // Note: When reloading there isn't a strict order of messages sent from the server
-            // I have no idea why debouncing the messages works, but for some reason that fixed the order
-            let debouncer = EventDebouncer::new(Duration::from_millis(10), move |data: String| {
-                let message = match serde_json::from_str(&data).unwrap() {
-                    Answer::AnswerPrint(answer) => Some(answer.message.bright_white()),
-                    Answer::AnswerError(answer) => Some(answer.error_message_prefix.red()),
-                    // When calling `crate::app::reload` in the watch thread,
-                    // reloading and writing to the save file is causing multiple prints.
-                    Answer::AnswerReload(_) if !watching => Some("Loading complete.".green()),
-                    _ => None,
-                };
+            match message {
+                // Only forward `Answer::AnswerReload` messages if watching
+                Answer::AnswerReload(_) if watching => {
+                    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
+                        stream.write_all(buffer.as_bytes())?;
+                        stream.flush()?;
+                    }
+                }
 
-                if let Some(msg) = message {
-                    let time = chrono::Local::now().format("%H:%M:%S").to_string();
-                    println!("[{}] {}", time.bright_white(), msg);
-                };
-            });
-            debouncer.put(buffer);
+                // Print all messages
+                //
+                // Skips `Answer::AnswerReload` when watching, otherwise reloading
+                // would cause multiple messages to print
+                _ => {
+                    // I'm not sure why, but the order of messages is more consistent with a debouncer
+                    let debouncer = EventDebouncer::new(
+                        Duration::from_millis(10),
+                        move |data: ComparableAnswer| {
+                            if let Some(msg) = data.0.message() {
+                                let time = chrono::Local::now().format("%H:%M:%S").to_string();
+                                println!("[{}] {}", time.bright_white(), msg);
+                            };
+                        },
+                    );
+                    debouncer.put(ComparableAnswer(message));
+                }
+            }
         }
     })
+}
+
+trait Message {
+    fn message(&self) -> Option<ColoredString>;
+}
+
+impl Message for Answer {
+    fn message(&self) -> Option<ColoredString> {
+        match self {
+            Answer::AnswerPrint(answer) => Some(answer.message.bright_white()),
+            Answer::AnswerError(answer) => Some(answer.error_message_prefix.red()),
+            Answer::AnswerReload(_) => Some("Loading complete.".green()),
+            _ => None,
+        }
+    }
 }
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
