@@ -60,9 +60,10 @@ fn console(api: ExternalEditorApi, watching: bool) -> JoinHandle<Result<()>> {
                 // Skips `Answer::AnswerReload` when watching, otherwise reloading
                 // would cause multiple messages to print
                 _ => {
-                    // I'm not sure why, but the order of messages is more consistent with a debouncer
+                    // The debouncer adds a small delay, so that log messages
+                    // are printed before in-game messages for better ordering
                     let debouncer = EventDebouncer::new(
-                        Duration::from_millis(10),
+                        Duration::from_millis(100),
                         move |data: ComparableAnswer| {
                             if let Some(msg) = data.0.message() {
                                 let time = chrono::Local::now().format("%H:%M:%S").to_string();
