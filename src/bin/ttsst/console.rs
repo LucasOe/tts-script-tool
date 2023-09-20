@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use colored::*;
 use debounce::EventDebouncer;
+use itertools::Itertools;
 use log::*;
 use notify::{self, RecursiveMode};
 use notify_debouncer_mini::{self as debouncer};
@@ -117,9 +118,11 @@ fn watch(paths: Vec<PathBuf>) -> JoinHandle<Result<()>> {
                         .into_iter()
                         .filter(|event| event.kind == debouncer::DebouncedEventKind::Any)
                         .filter_map(|event| event.path.strip_current_dir().ok())
-                        .collect();
+                        .collect_vec();
 
-                    app::reload(&api, paths, ReloadArgs { guid: None })?
+                    if !paths.is_empty() {
+                        app::reload(&api, paths, ReloadArgs { guid: None })?
+                    }
                 }
                 Err(err) => error!("{}", err),
             }
