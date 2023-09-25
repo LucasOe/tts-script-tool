@@ -29,10 +29,10 @@ impl Mode {
 
 /// Attaches the script to an object by adding the script tag and the script,
 /// and then reloads the save, the same way it does when pressing "Save & Play".
-pub fn attach(api: &ExternalEditorApi, path: PathBuf, guids: Guids) -> Result<()> {
+pub fn attach<P: AsRef<Path>>(api: &ExternalEditorApi, path: P, guids: Guids) -> Result<()> {
     let mut objects = get_objects(api, guids, Mode::Attach)?;
 
-    let tag = Tag::try_from(path.as_path())?;
+    let tag = Tag::try_from(path.as_ref())?;
     let file = read_file(path)?;
     for object in objects.iter_mut() {
         // Add lua tag to objects
@@ -77,10 +77,10 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: &ExternalEditorApi, paths: Vec<PathBuf>, args: ReloadArgs) -> Result<()> {
+pub fn reload(api: &ExternalEditorApi, paths: &[PathBuf], args: ReloadArgs) -> Result<()> {
     let mut save = Save::read(api)?;
 
-    for path in &paths.reduce() {
+    for path in &paths.to_vec().reduce() {
         match args.guid {
             Some(ref guid) => {
                 let object = save.objects.find_object_mut(guid)?;
