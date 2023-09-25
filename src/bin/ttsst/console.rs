@@ -1,6 +1,6 @@
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use colored::*;
@@ -17,7 +17,7 @@ use crate::{app, ReloadArgs};
 
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
-pub fn start(api: ExternalEditorApi, paths: Option<&[PathBuf]>) {
+pub fn start<P: AsRef<Path> + Sync>(api: ExternalEditorApi, paths: Option<&[P]>) {
     // Note: `std::process::exit` terminates all running threads
     std::thread::scope(|scope| {
         scope.spawn(move || {
@@ -104,7 +104,7 @@ impl Message for Answer {
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
 /// This thread uses its own `ExternalEditorApi` listening to port 39997.
-fn watch(paths: &[PathBuf]) -> Result<()> {
+fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<()> {
     // Constructs a new `ExternalEditorApi` listening to port 39997
     let api = tts_external_api::ExternalEditorApi {
         listener: TcpListener::bind("127.0.0.1:39997")?,
@@ -115,7 +115,9 @@ fn watch(paths: &[PathBuf]) -> Result<()> {
     let mut watcher = debouncer::new_debouncer(Duration::from_millis(500), tx)?;
 
     for path in paths {
-        watcher.watcher().watch(path, RecursiveMode::Recursive)?;
+        watcher
+            .watcher()
+            .watch(path.as_ref(), RecursiveMode::Recursive)?;
     }
 
     while let Ok(result) = rx.recv() {

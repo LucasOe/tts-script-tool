@@ -77,7 +77,11 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload(api: &ExternalEditorApi, paths: &[PathBuf], args: ReloadArgs) -> Result<()> {
+pub fn reload<P: AsRef<Path> + Clone>(
+    api: &ExternalEditorApi,
+    paths: &[P],
+    args: ReloadArgs,
+) -> Result<()> {
     let mut save = Save::read(api)?;
 
     for path in &paths.reduce::<Vec<_>>() {
@@ -132,14 +136,15 @@ fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<()> {
 }
 
 /// Backup current save as file
-pub fn backup(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
+pub fn backup<P: AsRef<Path>>(api: &ExternalEditorApi, path: P) -> Result<()> {
     let save_path = api.get_scripts()?.save_path;
     fs::copy(&save_path, &path)?;
 
     // Print information about the file
     let save_name = Path::new(&save_path).file_name().unwrap().to_str().unwrap();
+    let path_display = path.as_ref().to_slash_lossy();
     #[rustfmt::skip]
-    info!("save '{}' as '{}'", save_name.yellow(), path.to_slash_lossy().yellow());
+    info!("save '{}' as '{}'", save_name.yellow(), path_display.yellow());
 
     Ok(())
 }
@@ -149,15 +154,16 @@ pub fn backup(api: &ExternalEditorApi, path: PathBuf) -> Result<()> {
 fn get_objects(api: &ExternalEditorApi, guids: Guids, mode: Mode) -> Result<Objects> {
     let save = Save::read(api)?;
     match guids.guids {
-        Some(guids) => find_objects(save, guids),
+        Some(guids) => find_objects(save, &guids),
         None => select_objects(save, mode.msg(), guids.all),
     }
 }
 
 /// Once an `Result::Err` is found, the iteration will terminate and return the result.
 /// If `guids` only contains existing objects, a vec with the savestate of those objects will be returned.
-fn find_objects(save: Save, guids: Vec<String>) -> Result<Objects> {
+fn find_objects<T: AsRef<str>>(save: Save, guids: &[T]) -> Result<Objects> {
     guids
+        .as_ref()
         .iter()
         .map(|guid| save.objects.find_object(guid).cloned())
         .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
