@@ -17,7 +17,7 @@ use crate::{app, ReloadArgs};
 
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
-pub fn start(api: ExternalEditorApi, paths: Option<&[PathBuf]>) -> Result<()> {
+pub fn start(api: ExternalEditorApi, paths: Option<&[PathBuf]>) {
     // Note: `std::process::exit` terminates all running threads
     std::thread::scope(|scope| {
         scope.spawn(move || {
@@ -36,8 +36,6 @@ pub fn start(api: ExternalEditorApi, paths: Option<&[PathBuf]>) -> Result<()> {
             });
         }
     });
-
-    Err("console loop was aborted".into())
 }
 
 struct ComparableAnswer(Answer);
