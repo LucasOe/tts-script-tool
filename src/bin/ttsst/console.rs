@@ -22,7 +22,7 @@ pub fn start<P: AsRef<Path> + Sync>(api: ExternalEditorApi, paths: Option<&[P]>)
     std::thread::scope(|scope| {
         scope.spawn(move || {
             if let Err(err) = console(api, paths.is_some()) {
-                log::error!("{}", err);
+                error!("{}", err);
                 std::process::exit(1);
             }
         });
@@ -30,7 +30,7 @@ pub fn start<P: AsRef<Path> + Sync>(api: ExternalEditorApi, paths: Option<&[P]>)
         if let Some(paths) = paths {
             scope.spawn(move || {
                 if let Err(err) = watch(paths) {
-                    log::error!("{}", err);
+                    error!("{}", err);
                     std::process::exit(1);
                 }
             });
