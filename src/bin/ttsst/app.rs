@@ -80,7 +80,7 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
 pub fn reload(api: &ExternalEditorApi, paths: &[PathBuf], args: ReloadArgs) -> Result<()> {
     let mut save = Save::read(api)?;
 
-    for path in &paths.to_vec().reduce() {
+    for path in &paths.reduce::<Vec<_>>() {
         match args.guid {
             Some(ref guid) => {
                 let object = save.objects.find_object_mut(guid)?;
@@ -94,7 +94,7 @@ pub fn reload(api: &ExternalEditorApi, paths: &[PathBuf], args: ReloadArgs) -> R
         };
     }
 
-    update_global_files(&mut save, &paths)?;
+    update_global_files(&mut save, paths)?;
     update_save(api, &save)?;
     Ok(())
 }
@@ -304,20 +304,21 @@ fn select_paths<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
     }
 }
 
-trait Reduce {
+trait Reduce<P> {
     /// Filters and deduplicates the collection of paths, returning a new collection.
     ///
     /// This method removes duplicate paths based on their logical content and ensures that
     /// subfolders are not included if a parent folder is present in the collection.
-    fn reduce(&self) -> Self;
+    fn reduce<T: FromIterator<P>>(&self) -> T;
 }
 
-impl<P: AsRef<Path> + Clone> Reduce for Vec<P> {
-    fn reduce(&self) -> Self {
-        self.iter()
+impl<U: AsRef<[P]>, P: AsRef<Path> + Clone> Reduce<P> for U {
+    fn reduce<T: FromIterator<P>>(&self) -> T {
+        self.as_ref()
+            .iter()
             .unique_by(|path| path.as_ref().to_path_buf())
             .filter(|&this| {
-                !self.iter().any(|other| {
+                !self.as_ref().iter().any(|other| {
                     let paths = (this.as_ref(), other.as_ref());
                     paths.0 != paths.1 && paths.0.starts_with(paths.1)
                 })
