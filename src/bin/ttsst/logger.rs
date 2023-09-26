@@ -1,6 +1,6 @@
+use anyhow::Result;
 use colored::*;
 use log::*;
-use ttsst::error::Result;
 
 pub struct ConsoleLogger;
 

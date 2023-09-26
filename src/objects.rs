@@ -6,8 +6,8 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::tags::Tags;
-use crate::{error::Result, Tag};
+use crate::error::Result;
+use crate::tags::{Tag, Tags};
 
 #[derive(Deserialize, Serialize, Clone, Debug, Deref, DerefMut, Display, IntoIterator)]
 #[display(fmt = "{}", "self.0.iter().format(\", \")")]

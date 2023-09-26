@@ -3,9 +3,9 @@ mod console;
 mod logger;
 mod parser;
 
+use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
-use ttsst::error::Result;
 
 use crate::logger::ConsoleLogger;
 
