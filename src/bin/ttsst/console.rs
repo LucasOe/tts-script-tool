@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -38,8 +39,6 @@ pub fn start<P: AsRef<Path> + Sync>(api: ExternalEditorApi, paths: Option<&[P]>)
     });
 }
 
-enum Never {}
-
 struct ComparableAnswer(Answer);
 
 impl PartialEq for ComparableAnswer {
@@ -51,7 +50,7 @@ impl PartialEq for ComparableAnswer {
 
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
-fn console(api: ExternalEditorApi, watching: bool) -> Result<Never> {
+fn console(api: ExternalEditorApi, watching: bool) -> Result<Infallible> {
     loop {
         // Forward the message to the TcpStream on port 39997 if a connection exists
         let buffer = api.read_string();
@@ -106,7 +105,7 @@ impl Message for Answer {
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
 /// This thread uses its own `ExternalEditorApi` listening to port 39997.
-fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<Never> {
+fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<Infallible> {
     // Constructs a new `ExternalEditorApi` listening to port 39997
     let api = tts_external_api::ExternalEditorApi {
         listener: TcpListener::bind("127.0.0.1:39997")?,
