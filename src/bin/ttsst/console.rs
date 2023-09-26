@@ -38,6 +38,8 @@ pub fn start<P: AsRef<Path> + Sync>(api: ExternalEditorApi, paths: Option<&[P]>)
     });
 }
 
+enum Never {}
+
 struct ComparableAnswer(Answer);
 
 impl PartialEq for ComparableAnswer {
@@ -49,7 +51,7 @@ impl PartialEq for ComparableAnswer {
 
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
-fn console(api: ExternalEditorApi, watching: bool) -> Result<()> {
+fn console(api: ExternalEditorApi, watching: bool) -> Result<Never> {
     loop {
         // Forward the message to the TcpStream on port 39997 if a connection exists
         let buffer = api.read_string();
@@ -104,7 +106,7 @@ impl Message for Answer {
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
 /// This thread uses its own `ExternalEditorApi` listening to port 39997.
-fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<()> {
+fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<Never> {
     // Constructs a new `ExternalEditorApi` listening to port 39997
     let api = tts_external_api::ExternalEditorApi {
         listener: TcpListener::bind("127.0.0.1:39997")?,
@@ -120,8 +122,8 @@ fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<()> {
             .watch(path.as_ref(), RecursiveMode::Recursive)?;
     }
 
-    while let Ok(result) = rx.recv() {
-        match result {
+    loop {
+        match rx.recv()? {
             Ok(events) => {
                 let paths = events
                     .iter()
@@ -136,8 +138,6 @@ fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<()> {
             Err(err) => error!("{}", err),
         }
     }
-
-    Ok(())
 }
 
 trait StripCurrentDir {
