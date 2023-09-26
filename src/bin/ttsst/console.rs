@@ -3,6 +3,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use anyhow::Result;
 use colored::*;
 use debounce::EventDebouncer;
 use itertools::Itertools;
@@ -11,7 +12,6 @@ use notify::{self, RecursiveMode};
 use notify_debouncer_mini::{self as debouncer};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
-use ttsst::error::Result;
 
 use crate::{app, ReloadArgs};
 

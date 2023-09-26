@@ -2,13 +2,13 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use anyhow::{anyhow, Result};
 use colored::Colorize;
 use derive_more::Display;
 use itertools::Itertools;
 use log::*;
 use path_slash::PathExt;
 use tts_external_api::ExternalEditorApi;
-use ttsst::error::Result;
 use ttsst::{Object, Objects, Save, Tag};
 
 use crate::{Guids, ReloadArgs};
@@ -165,7 +165,12 @@ fn find_objects<T: AsRef<str>>(save: Save, guids: &[T]) -> Result<Objects> {
     guids
         .as_ref()
         .iter()
-        .map(|guid| save.objects.find_object(guid).cloned())
+        .map(|guid| {
+            save.objects
+                .find_object(guid)
+                .map_err(|err| anyhow!(err))
+                .cloned()
+        })
         .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
 }
 
