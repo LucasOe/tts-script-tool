@@ -12,8 +12,8 @@ pub enum Error {
     Msg(String),
 }
 
-impl From<&'static str> for Error {
-    fn from(s: &'static str) -> Self {
+impl From<&str> for Error {
+    fn from(s: &str) -> Self {
         Error::Msg(s.to_owned())
     }
 }
