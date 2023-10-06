@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use colored::Colorize;
 use derive_more::Display;
 use itertools::Itertools;
@@ -168,7 +168,7 @@ fn find_objects<T: AsRef<str>>(save: Save, guids: &[T]) -> Result<Objects> {
         .map(|guid| {
             save.objects
                 .find_object(guid)
-                .map_err(|err| anyhow!(err))
+                .map_err(|err| err.into())
                 .cloned()
         })
         .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
