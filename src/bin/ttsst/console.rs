@@ -61,13 +61,13 @@ fn console<P: AsRef<Path>>(api: ExternalEditorApi, paths: Option<&[P]>) -> Resul
         match (&message, &paths) {
             // Only forward `Answer::AnswerReload` messages if watching
             (Answer::AnswerReload(answer), Some(paths)) => {
+                // Reload all objects so that script changes get applied
+                update_save_on_change(&api, &answer.save_path, &paths)?;
+
                 if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
                     stream.write_all(buffer.as_bytes())?;
                     stream.flush()?;
                 }
-
-                // Reload all objects so that script changes get applied
-                update_save_on_change(&api, &answer.save_path, &paths)?;
             }
 
             // Print all messages
