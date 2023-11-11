@@ -84,14 +84,15 @@ pub fn reload<P: AsRef<Path> + Clone>(
 ) -> Result<()> {
     let mut save = Save::read(api)?;
 
+    let mut has_changed = false;
     for path in &paths.reduce::<Vec<_>>() {
         // Reload objects
         if let Some(guid) = &args.guid {
             let object = save.objects.find_object_mut(guid)?;
-            reload_object(object, path)?;
+            has_changed = reload_object(object, path)?;
         } else {
             for object in save.objects.iter_mut() {
-                reload_object(object, path)?;
+                has_changed = reload_object(object, path)?;
             }
         }
 
@@ -103,8 +104,10 @@ pub fn reload<P: AsRef<Path> + Clone>(
         }
     }
 
-    update_global_files(&mut save, paths)?;
-    update_save(api, &mut save)?;
+    if has_changed {
+        update_global_files(&mut save, paths)?;
+        update_save(api, &mut save)?;
+    }
     Ok(())
 }
 
