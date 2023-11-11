@@ -55,7 +55,7 @@ pub fn attach<P: AsRef<Path>>(api: &ExternalEditorApi, path: P, guids: Guids) ->
     let mut save = Save::read(api)?;
     save.objects.replace(&mut objects);
 
-    update_save(api, &save)?;
+    update_save(api, &mut save)?;
     Ok(())
 }
 
@@ -72,7 +72,7 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
     let mut save = Save::read(api)?;
     save.objects.replace(&mut objects);
 
-    update_save(api, &save)?;
+    update_save(api, &mut save)?;
     Ok(())
 }
 
@@ -85,54 +85,73 @@ pub fn reload<P: AsRef<Path> + Clone>(
     let mut save = Save::read(api)?;
 
     for path in &paths.reduce::<Vec<_>>() {
-        match args.guid {
-            Some(ref guid) => {
-                let object = save.objects.find_object_mut(guid)?;
+        // Reload objects
+        if let Some(guid) = &args.guid {
+            let object = save.objects.find_object_mut(guid)?;
+            reload_object(object, path)?;
+        } else {
+            for object in save.objects.iter_mut() {
                 reload_object(object, path)?;
             }
-            None => {
-                for object in save.objects.iter_mut() {
-                    reload_object(object, path)?;
-                }
-            }
-        };
+        }
+
+        // Add the paths as a component tag, so that in watch mode reloaded paths
+        // will show up as tags.
+        // NOTE: These have to be cleaned up after exiting watch mode
+        if let Ok(tag) = Tag::try_from(path.as_ref()) {
+            save.tags.push(tag);
+        }
     }
 
     update_global_files(&mut save, paths)?;
-    update_save(api, &save)?;
+    update_save(api, &mut save)?;
     Ok(())
 }
 
 /// Reload the lua script and xml ui of an `object`, if its tag matches the `path`
-fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<()> {
+pub fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
     // Update lua scripts if the path is a lua file
-    match object.valid_lua()? {
+    let lua_change = match object.valid_lua()? {
         Some(tag) if tag.starts_with(&path) => {
-            object.lua_script = read_file(tag.path()?)?;
-            info!("updated {object}");
+            let file = read_file(tag.path()?)?;
+            if object.lua_script != file {
+                object.lua_script = file;
+                info!("updated {object}");
+                true
+            } else {
+                false
+            }
         }
         // Remove lua script if the objects has no valid tag
         None if !object.lua_script.is_empty() => {
             object.lua_script = "".to_string();
             info!("removed lua script from {}", object);
+            true
         }
-        _ => {}
+        _ => false,
     };
     // Update xml ui if the path is a xml file
-    match object.valid_xml()? {
+    let xml_change = match object.valid_xml()? {
         Some(tag) if tag.starts_with(&path) => {
-            object.xml_ui = read_file(tag.path()?)?;
-            info!("updated {object}");
+            let file = read_file(tag.path()?)?;
+            if object.xml_ui != file {
+                object.xml_ui = read_file(tag.path()?)?;
+                info!("updated {object}");
+                true
+            } else {
+                false
+            }
         }
         // Remove xml ui if the objects has no valid tag
         None if !object.xml_ui.is_empty() => {
             object.xml_ui = "".to_string();
             info!("removed xml ui from {}", object);
+            true
         }
-        _ => {}
+        _ => false,
     };
 
-    Ok(())
+    Ok(lua_change || xml_change)
 }
 
 /// Backup current save as file
@@ -189,7 +208,7 @@ fn select_objects(save: Save, message: &str, show_all: bool) -> Result<Objects> 
 
 /// Overwrite the save file and reload the current save,
 /// the same way it get reloaded when pressing “Save & Play” within the in-game editor.
-fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
+pub fn update_save(api: &ExternalEditorApi, save: &mut Save) -> Result<()> {
     // Warning if tag an lua script or xml ui are mismatched
     for object in save.objects.iter() {
         if let (None, false) = (object.valid_lua()?, object.lua_script.is_empty()) {
@@ -203,6 +222,9 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
             warn!("If you manually removed the tag, use the detach command to remove the xml ui");
         }
     }
+
+    // Remove component tags, if they exist as object tags
+    save.tags.remove_object_tags(&save.objects);
 
     // Overwrite the save file with the modified objects
     save.write(api)?;
@@ -226,7 +248,7 @@ fn update_save(api: &ExternalEditorApi, save: &Save) -> Result<()> {
 ///
 /// If the file is empty, this function will use a placeholder text to avoid writing an empty string.
 /// See [`Save::write`].
-fn update_global_files<P: AsRef<Path>>(save: &mut Save, paths: &[P]) -> Result<()> {
+pub fn update_global_files<P: AsRef<Path>>(save: &mut Save, paths: &[P]) -> Result<()> {
     const GLOBAL_LUA: &[&str] = &["Global.lua", "Global.ttslua"];
     const GLOBAL_XML: &[&str] = &["Global.xml"];
 

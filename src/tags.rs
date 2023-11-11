@@ -62,6 +62,11 @@ impl TryFrom<&Path> for Tag {
 }
 
 impl Tag {
+    /// Consumes `Tag`, returning the wrapped value.
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+
     /// Returns `true` if either `is_lua` or `is_xml` returns true.
     pub fn is_valid(&self) -> bool {
         self.is_lua() || self.is_xml()
@@ -96,6 +101,21 @@ impl Tag {
         match self.path() {
             Ok(path) => path.starts_with(base),
             Err(_) => false,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug)]
+pub struct Label {
+    pub displayed: String,
+    pub normalized: String,
+}
+
+impl From<Tag> for Label {
+    fn from(value: Tag) -> Self {
+        Label {
+            displayed: value.0.clone(),
+            normalized: value.0.clone(),
         }
     }
 }
