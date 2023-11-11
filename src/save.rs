@@ -17,29 +17,6 @@ pub struct ComponentTags {
     pub labels: Vec<Label>,
 }
 
-impl ComponentTags {
-    // Add `tag` to `self`, if it isn't already included in the labels
-    pub fn push(&mut self, tag: Tag) {
-        let label = Label::from(tag.clone());
-        if !self.labels.contains(&label) {
-            self.labels.push(label);
-            info!("added {} as a component tag", tag);
-        }
-    }
-
-    // Remove component tags that exist as object tags
-    pub fn remove_object_tags(&mut self, objects: &Objects) {
-        self.labels.retain(|label| {
-            !objects.iter().any(|object| {
-                object
-                    .tags
-                    .iter()
-                    .any(|tag| &Label::from(tag.clone()) == label)
-            })
-        })
-    }
-}
-
 /// A representation of the Tabletop Simulator [Save File Format](https://kb.tabletopsimulator.com/custom-content/save-file-format/).
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Save {
@@ -85,5 +62,34 @@ impl Save {
 
         debug!("trying to write save to {}", save_path.display());
         serde_json::to_writer_pretty(writer, self).map_err(|err| err.into())
+    }
+
+    // Add `tag` to `self`, if it isn't already included in the labels or object tags
+    pub fn push_object_tag(&mut self, tag: Tag) -> bool {
+        let label = Label::from(tag.clone());
+        let objects_include = self
+            .objects
+            .iter()
+            .any(|object| object.tags.iter().any(|t| t == &tag));
+
+        if !self.tags.labels.contains(&label) && !objects_include {
+            self.tags.labels.push(label);
+            info!("added {} as a component tag", tag);
+            true
+        } else {
+            false
+        }
+    }
+
+    // Remove component tags that exist as object tags
+    pub fn remove_object_tags(&mut self) {
+        self.tags.labels.retain(|label| {
+            !self.objects.iter().any(|object| {
+                object
+                    .tags
+                    .iter()
+                    .any(|tag| &Label::from(tag.clone()) == label)
+            })
+        })
     }
 }
