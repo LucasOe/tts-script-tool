@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::{collections::HashMap, path::PathBuf};
 use std::{fs, io};
 
@@ -62,10 +63,14 @@ impl Save {
     /// Reads the currently open save file and returns it as a `Save`.
     pub fn read(api: &ExternalEditorApi) -> Result<Self> {
         let save_path = PathBuf::from(api.get_scripts()?.save_path);
+        Save::read_from_path(&save_path)
+    }
+
+    pub fn read_from_path<P: AsRef<Path>>(save_path: &P) -> Result<Self> {
         let file = fs::File::open(&save_path)?;
         let reader = io::BufReader::new(file);
 
-        debug!("trying to read save from {}", save_path.display());
+        debug!("trying to read save from {}", save_path.as_ref().display());
         serde_json::from_reader(reader).map_err(|err| err.into())
     }
 
