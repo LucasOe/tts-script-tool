@@ -33,7 +33,7 @@ impl Tags {
 }
 
 /// A tag associated with an [`Object`](crate::objects::Object).
-#[derive(Deserialize, Serialize, Clone, Debug, Display)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug, Display)]
 #[display(fmt = "{}", "self.0.yellow()")]
 pub struct Tag(String);
 

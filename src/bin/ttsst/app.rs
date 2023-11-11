@@ -100,7 +100,7 @@ pub fn reload<P: AsRef<Path> + Clone>(
         // will show up as tags.
         // NOTE: These have to be cleaned up after exiting watch mode
         if let Ok(tag) = Tag::try_from(path.as_ref()) {
-            save.tags.push(tag);
+            has_changed = save.push_object_tag(tag);
         }
     }
 
@@ -227,7 +227,7 @@ pub fn update_save(api: &ExternalEditorApi, save: &mut Save) -> Result<()> {
     }
 
     // Remove component tags, if they exist as object tags
-    save.tags.remove_object_tags(&save.objects);
+    save.remove_object_tags();
 
     // Overwrite the save file with the modified objects
     save.write(api)?;
