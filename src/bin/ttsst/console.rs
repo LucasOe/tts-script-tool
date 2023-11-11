@@ -13,6 +13,7 @@ use notify::{self, RecursiveMode};
 use notify_debouncer_mini::{self as debouncer};
 use tts_external_api::messages::Answer;
 use tts_external_api::ExternalEditorApi;
+use ttsst::Save;
 
 use crate::{app, ReloadArgs};
 
@@ -22,7 +23,7 @@ pub fn start<P: AsRef<Path> + Sync>(api: ExternalEditorApi, paths: Option<&[P]>)
     // Note: `std::process::exit` terminates all running threads
     std::thread::scope(|scope| {
         scope.spawn(move || {
-            if let Err(err) = console(api, paths.is_some()) {
+            if let Err(err) = console(api, paths) {
                 error!("{}", err);
                 std::process::exit(1);
             }
@@ -50,20 +51,23 @@ impl PartialEq for ComparableAnswer {
 
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
-fn console(api: ExternalEditorApi, watching: bool) -> Result<Infallible> {
+fn console<P: AsRef<Path>>(api: ExternalEditorApi, paths: Option<&[P]>) -> Result<Infallible> {
     loop {
         // Forward the message to the TcpStream on port 39997 if a connection exists
         let buffer = api.read_string();
         let message: Answer = serde_json::from_str(&buffer)?;
 
         // Note: When reloading there isn't a strict order of messages sent from the server
-        match message {
+        match (&message, &paths) {
             // Only forward `Answer::AnswerReload` messages if watching
-            Answer::AnswerReload(_) if watching => {
+            (Answer::AnswerReload(_), Some(paths)) => {
                 if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
                     stream.write_all(buffer.as_bytes())?;
                     stream.flush()?;
                 }
+
+                // Reload all objects so that script changes get applied
+                update_save_on_change(&api, &paths)?;
             }
 
             // Print all messages
@@ -101,6 +105,23 @@ impl Message for Answer {
             _ => None,
         }
     }
+}
+
+/// Reload all objects in the currently loaded save and if scripts or tags have changed,
+/// then update the save.
+fn update_save_on_change<P: AsRef<Path>>(api: &ExternalEditorApi, paths: &[P]) -> Result<()> {
+    let mut save = Save::read(&api)?;
+
+    if paths.iter().any(|path| {
+        save.objects
+            .iter_mut()
+            .any(|object| app::reload_object(object, path).unwrap_or(false))
+    }) {
+        app::update_global_files(&mut save, paths)?;
+        app::update_save(&api, &mut save)?;
+    }
+
+    Ok(())
 }
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
