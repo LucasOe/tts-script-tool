@@ -60,14 +60,14 @@ fn console<P: AsRef<Path>>(api: ExternalEditorApi, paths: Option<&[P]>) -> Resul
         // Note: When reloading there isn't a strict order of messages sent from the server
         match (&message, &paths) {
             // Only forward `Answer::AnswerReload` messages if watching
-            (Answer::AnswerReload(_), Some(paths)) => {
+            (Answer::AnswerReload(answer), Some(paths)) => {
                 if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
                     stream.write_all(buffer.as_bytes())?;
                     stream.flush()?;
                 }
 
                 // Reload all objects so that script changes get applied
-                update_save_on_change(&api, &paths)?;
+                update_save_on_change(&api, &answer.save_path, &paths)?;
             }
 
             // Print all messages
@@ -109,8 +109,12 @@ impl Message for Answer {
 
 /// Reload all objects in the currently loaded save and if scripts or tags have changed,
 /// then update the save.
-fn update_save_on_change<P: AsRef<Path>>(api: &ExternalEditorApi, paths: &[P]) -> Result<()> {
-    let mut save = Save::read(&api)?;
+fn update_save_on_change<P: AsRef<Path>, Q: AsRef<Path>>(
+    api: &ExternalEditorApi,
+    save_path: &P,
+    paths: &[Q],
+) -> Result<()> {
+    let mut save = Save::read_from_path(save_path)?;
 
     if paths.iter().any(|path| {
         save.objects
