@@ -77,16 +77,12 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload<P: AsRef<Path> + Clone, Q: AsRef<Path>>(
+pub fn reload<P: AsRef<Path> + Clone>(
     api: &ExternalEditorApi,
     paths: &[P],
     args: ReloadArgs,
-    save_path: Option<&Q>,
 ) -> Result<()> {
-    let mut save = match save_path {
-        Some(save_path) => Save::read_from_path(save_path)?,
-        None => Save::read(api)?,
-    };
+    let mut save = Save::read(api)?;
 
     let mut has_changed = false;
     for path in &paths.reduce::<Vec<_>>() {
@@ -102,7 +98,6 @@ pub fn reload<P: AsRef<Path> + Clone, Q: AsRef<Path>>(
 
         // Add the paths as a component tag, so that in watch mode reloaded paths
         // will show up as tags.
-        // NOTE: These have to be cleaned up after exiting watch mode
         if let Ok(tag) = Tag::try_from(path.as_ref()) {
             has_changed = save.push_object_tag(tag);
         }
@@ -116,7 +111,7 @@ pub fn reload<P: AsRef<Path> + Clone, Q: AsRef<Path>>(
 }
 
 /// Reload the lua script and xml ui of an `object`, if its tag matches the `path`
-pub fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
+fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
     // Update lua scripts if the path is a lua file
     let lua_change = match object.valid_lua()? {
         Some(tag) if tag.starts_with(&path) => {
@@ -255,7 +250,7 @@ pub fn update_save(api: &ExternalEditorApi, save: &mut Save) -> Result<()> {
 ///
 /// If the file is empty, this function will use a placeholder text to avoid writing an empty string.
 /// See [`Save::write`].
-pub fn update_global_files<P: AsRef<Path>>(save: &mut Save, paths: &[P]) -> Result<()> {
+fn update_global_files<P: AsRef<Path>>(save: &mut Save, paths: &[P]) -> Result<()> {
     const GLOBAL_LUA: &[&str] = &["Global.lua", "Global.ttslua"];
     const GLOBAL_XML: &[&str] = &["Global.xml"];
 

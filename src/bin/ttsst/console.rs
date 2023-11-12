@@ -18,7 +18,7 @@ use crate::{app, ReloadArgs};
 
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
-pub fn start<P: AsRef<Path> + Clone + Sync>(api: ExternalEditorApi, paths: Option<&[P]>) {
+pub fn start<P: AsRef<Path> + Clone + Sync>(api: &ExternalEditorApi, paths: Option<&[P]>) {
     // Note: `std::process::exit` terminates all running threads
     std::thread::scope(|scope| {
         scope.spawn(move || {
@@ -51,7 +51,7 @@ impl PartialEq for ComparableAnswer {
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
 fn console<P: AsRef<Path> + Clone>(
-    api: ExternalEditorApi,
+    api: &ExternalEditorApi,
     paths: Option<&[P]>,
 ) -> Result<Infallible> {
     loop {
@@ -62,14 +62,9 @@ fn console<P: AsRef<Path> + Clone>(
         // Note: When reloading there isn't a strict order of messages sent from the server
         match (&message, &paths) {
             // Only forward `Answer::AnswerReload` messages if watching
-            (Answer::AnswerReload(answer), Some(paths)) => {
+            (Answer::AnswerReload(_), Some(paths)) => {
                 // Reload all objects so that script changes get applied
-                app::reload(
-                    &api,
-                    paths,
-                    ReloadArgs { guid: None },
-                    Some(&answer.save_path),
-                )?;
+                app::reload(api, paths, ReloadArgs { guid: None })?;
 
                 if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
                     stream.write_all(buffer.as_bytes())?;
@@ -142,7 +137,7 @@ fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<Infallible> {
                     .collect_vec();
 
                 if !paths.is_empty() {
-                    app::reload(&api, &paths, ReloadArgs { guid: None }, None::<&PathBuf>)?
+                    app::reload(&api, &paths, ReloadArgs { guid: None })?
                 }
             }
             Err(err) => error!("{}", err),
