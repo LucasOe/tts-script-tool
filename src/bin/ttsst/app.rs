@@ -89,17 +89,17 @@ pub fn reload<P: AsRef<Path> + Clone>(
         // Reload objects
         if let Some(guid) = &args.guid {
             let object = save.objects.find_object_mut(guid)?;
-            has_changed = reload_object(object, path)?;
+            has_changed |= reload_object(object, path)?;
         } else {
             for object in save.objects.iter_mut() {
-                has_changed = reload_object(object, path)?;
+                has_changed |= reload_object(object, path)?;
             }
         }
 
         // Add the paths as a component tag, so that in watch mode reloaded paths
         // will show up as tags.
         if let Ok(tag) = Tag::try_from(path.as_ref()) {
-            has_changed = save.push_object_tag(tag);
+            has_changed |= save.push_object_tag(tag);
         }
     }
 
