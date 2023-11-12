@@ -44,7 +44,7 @@ impl Save {
     }
 
     pub fn read_from_path<P: AsRef<Path>>(save_path: &P) -> Result<Self> {
-        let file = fs::File::open(&save_path)?;
+        let file = fs::File::open(save_path)?;
         let reader = io::BufReader::new(file);
 
         debug!("trying to read save from {}", save_path.as_ref().display());

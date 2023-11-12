@@ -77,12 +77,16 @@ pub fn detach(api: &ExternalEditorApi, guids: Guids) -> Result<()> {
 }
 
 /// Update the lua scripts and reload the save file.
-pub fn reload<P: AsRef<Path> + Clone>(
+pub fn reload<P: AsRef<Path> + Clone, Q: AsRef<Path>>(
     api: &ExternalEditorApi,
     paths: &[P],
     args: ReloadArgs,
+    save_path: Option<&Q>,
 ) -> Result<()> {
-    let mut save = Save::read(api)?;
+    let mut save = match save_path {
+        Some(save_path) => Save::read_from_path(save_path)?,
+        None => Save::read(api)?,
+    };
 
     let mut has_changed = false;
     for path in &paths.reduce::<Vec<_>>() {

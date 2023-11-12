@@ -111,7 +111,7 @@ fn run(args: Cli) -> Result<()> {
     match args.command {
         Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
         Commands::Detach { guids } => app::detach(&api, guids)?,
-        Commands::Reload { paths, args } => app::reload(&api, &paths, args)?,
+        Commands::Reload { paths, args } => app::reload(&api, &paths, args, None::<&PathBuf>)?,
         Commands::Console => console::start::<PathBuf>(api, None),
         Commands::Watch { paths } => console::start(api, Some(&paths)),
         Commands::Backup { path } => app::backup(&api, path)?,
