@@ -62,9 +62,9 @@ fn console<P: AsRef<Path> + Clone>(
         // Note: When reloading there isn't a strict order of messages sent from the server
         match (&message, &paths) {
             // Only forward `Answer::AnswerReload` messages if watching
-            (Answer::AnswerReload(_), Some(_paths)) => {
+            (Answer::AnswerReload(_), Some(paths)) => {
                 // Reload all objects so that script changes get applied
-                //app::reload(api, paths, ReloadArgs { guid: None })?;
+                app::reload(api, paths, ReloadArgs { guid: None })?;
 
                 if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
                     stream.write_all(buffer.as_bytes())?;
