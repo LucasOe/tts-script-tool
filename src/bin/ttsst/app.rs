@@ -9,9 +9,9 @@ use itertools::Itertools;
 use log::*;
 use path_slash::PathExt;
 use tts_external_api::ExternalEditorApi as Api;
-use ttsst::save::SaveFile;
-use ttsst::{Object, Objects, Save, Tag};
+use ttsst::{Object, Objects, Tag};
 
+use crate::save_file::SaveFile;
 use crate::{Guids, ReloadArgs};
 
 pub enum Mode {
@@ -28,39 +28,10 @@ impl Mode {
     }
 }
 
-pub trait SaveFileExt {
+impl SaveFile {
     /// Attaches the script to an object by adding the script tag and the script,
     /// and then reloads the save.
-    fn attach<P: AsRef<Path>>(&mut self, api: &Api, path: P, guids: Guids) -> Result<()>;
-
-    // Detaches a script and removes all valid tags from an object.
-    fn detach(&mut self, api: &Api, guids: Guids) -> Result<()>;
-
-    /// Updates the scripts for all objects that use a script from `path`,
-    /// and then reloads the save.
-    fn reload<P: AsRef<Path>>(&mut self, api: &Api, paths: &[P], args: ReloadArgs) -> Result<()>
-    where
-        P: Clone;
-
-    /// Backup current save as file
-    fn backup<P: AsRef<Path>>(&self, path: P) -> Result<()>;
-
-    /// Overwrite the save file and reload the current save,
-    /// the same way it get reloaded when pressing “Save & Play” within the in-game editor.
-    fn update_save(&mut self, api: &Api) -> Result<()>;
-}
-
-pub trait SaveExt {
-    /// Set the lua script of the save to either `Global.lua` or `Global.ttslua`, if one of them exists in the `path` directory.
-    /// Set the xml ui of the save to `Global.xml`, if it exists in the `path` directory.
-    ///
-    /// If the file is empty, this function will use a placeholder text to avoid writing an empty string.
-    /// See [`Save::write`].
-    fn update_global_files<P: AsRef<Path>>(&mut self, paths: &[P]) -> Result<()>;
-}
-
-impl SaveFileExt for SaveFile {
-    fn attach<P: AsRef<Path>>(&mut self, api: &Api, path: P, guids: Guids) -> Result<()> {
+    pub fn attach<P: AsRef<Path>>(&mut self, api: &Api, path: P, guids: Guids) -> Result<()> {
         let mut objects = self.save.objects.get_objects(guids, Mode::Attach)?;
 
         let tag = Tag::try_from(path.as_ref())?;
@@ -85,11 +56,12 @@ impl SaveFileExt for SaveFile {
         // Add objects to a new save state
         self.save.objects.replace(&mut objects);
 
-        self.update_save(api)?;
+        self.update(api)?;
         Ok(())
     }
 
-    fn detach(&mut self, api: &Api, guids: Guids) -> Result<()> {
+    // Detaches a script and removes all valid tags from an object.
+    pub fn detach(&mut self, api: &Api, guids: Guids) -> Result<()> {
         let mut objects = self.save.objects.get_objects(guids, Mode::Detach)?;
 
         // Remove tags and script from objects
@@ -101,16 +73,16 @@ impl SaveFileExt for SaveFile {
         // Add objects to a new save state
         self.save.objects.replace(&mut objects);
 
-        self.update_save(api)?;
+        self.update(api)?;
         Ok(())
     }
 
-    fn reload<P: AsRef<Path> + Clone>(
-        &mut self,
-        api: &Api,
-        paths: &[P],
-        args: ReloadArgs,
-    ) -> Result<()> {
+    /// Updates the scripts for all objects that use a script from `path`,
+    /// and then reloads the save.
+    pub fn reload<P: AsRef<Path>>(&mut self, api: &Api, paths: &[P], args: ReloadArgs) -> Result<()>
+    where
+        P: Clone,
+    {
         let mut has_changed = false;
         for path in &paths.reduce::<Vec<_>>() {
             // Reload objects
@@ -132,14 +104,15 @@ impl SaveFileExt for SaveFile {
         }
 
         if has_changed {
-            self.save.update_global_files(paths)?;
-            self.update_save(api)?;
+            self.update_global_files(paths)?;
+            self.update(api)?;
         }
 
         Ok(())
     }
 
-    fn backup<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    /// Backup current save as file
+    pub fn backup<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         fs::copy(&self.path, &path)?;
 
         // Print information about the file
@@ -151,7 +124,9 @@ impl SaveFileExt for SaveFile {
         Ok(())
     }
 
-    fn update_save(&mut self, api: &Api) -> Result<()> {
+    /// Overwrite the save file and reload the current save,
+    /// the same way it get reloaded when pressing “Save & Play” within the in-game editor.
+    fn update(&mut self, api: &Api) -> Result<()> {
         // Warning if tag an lua script or xml ui are mismatched
         for object in self.save.objects.iter() {
             if let (None, false) = (object.valid_lua()?, object.lua_script.is_empty()) {
@@ -185,9 +160,12 @@ impl SaveFileExt for SaveFile {
         info!("reloading {}", self.save.name.blue());
         Ok(())
     }
-}
 
-impl SaveExt for Save {
+    /// Set the lua script of the save to either `Global.lua` or `Global.ttslua`, if one of them exists in the `path` directory.
+    /// Set the xml ui of the save to `Global.xml`, if it exists in the `path` directory.
+    ///
+    /// If the file is empty, this function will use a placeholder text to avoid writing an empty string.
+    /// See [`Save::write`].
     fn update_global_files<P: AsRef<Path>>(&mut self, paths: &[P]) -> Result<()> {
         const GLOBAL_LUA: &[&str] = &["Global.lua", "Global.ttslua"];
         const GLOBAL_XML: &[&str] = &["Global.xml"];
@@ -205,10 +183,10 @@ impl SaveExt for Save {
                 true => "--[[ Lua code. See documentation: https://api.tabletopsimulator.com/ --]]".to_string(),
                 false => file,
             };
-            if self.lua_script != lua_script {
+            if self.save.lua_script != lua_script {
                 #[rustfmt::skip]
                 info!("updated {} using '{}'", "Global Lua".yellow(), path.to_slash_lossy().yellow());
-                self.lua_script = lua_script;
+                self.save.lua_script = lua_script;
             };
         };
 
@@ -220,10 +198,10 @@ impl SaveExt for Save {
                 true => "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->".to_string(),
                 false => file,
             };
-            if self.xml_ui != xml_ui {
+            if self.save.xml_ui != xml_ui {
                 #[rustfmt::skip]
                 info!("updated {} using '{}'", "Global UI".yellow(), path.to_slash_lossy().yellow());
-                self.xml_ui = xml_ui;
+                self.save.xml_ui = xml_ui;
             };
         };
 

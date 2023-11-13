@@ -11,9 +11,8 @@ use notify_debouncer_mini::{self as debouncer};
 use serde_json::json;
 use tts_external_api::messages::{Answer, MessageReload};
 use tts_external_api::ExternalEditorApi;
-use ttsst::save::SaveFile;
 
-use crate::app::SaveFileExt;
+use crate::save_file::SaveFile;
 use crate::ReloadArgs;
 
 /// Show print, log and error messages in the console.
