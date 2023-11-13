@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use anyhow::Result;
 use colored::*;
-use debounce::EventDebouncer;
 use itertools::Itertools;
 use log::*;
 use notify::{self, RecursiveMode};
@@ -58,31 +57,18 @@ fn console<P: AsRef<Path> + Clone>(
         let buffer = api.read_string();
         let message: Answer = serde_json::from_str(&buffer)?;
 
-        // Note: When reloading there isn't a strict order of messages sent from the server
-        match (&message, &paths) {
-            // Reload changes if the save gets reloaded while in watch mode
-            (Answer::AnswerReload(_), Some(paths)) => {
-                app::reload(api, paths, ReloadArgs { guid: None })?;
-            }
+        // Reload changes if the save gets reloaded while in watch mode
+        if let (Answer::AnswerReload(_), Some(paths)) = (&message, &paths) {
+            app::reload(api, paths, ReloadArgs { guid: None })?;
+        }
 
-            // Print all messages
-            //
-            // Skips `Answer::AnswerReload` when watching, otherwise reloading
-            // would cause multiple messages to print
-            _ => {
-                // The debouncer adds a small delay, so that log messages
-                // are printed before in-game messages for better ordering
-                let debouncer = EventDebouncer::new(
-                    Duration::from_millis(100),
-                    move |data: ComparableAnswer| {
-                        if let Some(msg) = data.0.message() {
-                            let time = chrono::Local::now().format("%H:%M:%S").to_string();
-                            println!("[{}] {}", time.bright_white(), msg);
-                        };
-                    },
-                );
-                debouncer.put(ComparableAnswer(message));
-            }
+        // Print all messages
+        //
+        // Skips `Answer::AnswerReload` when watching, otherwise reloading
+        // would cause multiple messages to print
+        if let Some(msg) = message.message() {
+            let time = chrono::Local::now().format("%H:%M:%S").to_string();
+            println!("[{}] {}", time.bright_white(), msg);
         }
     }
 }
@@ -128,6 +114,7 @@ fn watch<P: AsRef<Path>>(api: &ExternalEditorApi, paths: &[P]) -> Result<Infalli
                     // Send ReloadMessage. Waiting for an answer would block the thread,
                     // because the tcp listener is already in use.
                     api.send(MessageReload::new(json!([])).as_message())?;
+                    println!("");
                 }
             }
             Err(err) => error!("{}", err),
