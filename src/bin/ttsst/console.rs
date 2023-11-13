@@ -114,7 +114,6 @@ fn watch<P: AsRef<Path>>(api: &ExternalEditorApi, paths: &[P]) -> Result<Infalli
                     // Send ReloadMessage. Waiting for an answer would block the thread,
                     // because the tcp listener is already in use.
                     api.send(MessageReload::new(json!([])).as_message())?;
-                    println!("");
                 }
             }
             Err(err) => error!("{}", err),
