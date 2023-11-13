@@ -53,9 +53,7 @@ fn console<P: AsRef<Path> + Clone>(
     paths: Option<&[P]>,
 ) -> Result<Infallible> {
     loop {
-        // Forward the message to the TcpStream on port 39997 if a connection exists
-        let buffer = api.read_string();
-        let message: Answer = serde_json::from_str(&buffer)?;
+        let message = api.read();
 
         // Reload changes if the save gets reloaded while in watch mode
         if let (Answer::AnswerReload(_), Some(paths)) = (&message, &paths) {
