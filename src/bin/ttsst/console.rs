@@ -1,6 +1,4 @@
 use std::convert::Infallible;
-use std::io::Write;
-use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -11,7 +9,8 @@ use itertools::Itertools;
 use log::*;
 use notify::{self, RecursiveMode};
 use notify_debouncer_mini::{self as debouncer};
-use tts_external_api::messages::Answer;
+use serde_json::json;
+use tts_external_api::messages::{Answer, MessageReload};
 use tts_external_api::ExternalEditorApi;
 
 use crate::{app, ReloadArgs};
@@ -30,7 +29,7 @@ pub fn start<P: AsRef<Path> + Clone + Sync>(api: &ExternalEditorApi, paths: Opti
 
         if let Some(paths) = paths {
             scope.spawn(move || {
-                if let Err(err) = watch(paths) {
+                if let Err(err) = watch(api, paths) {
                     error!("{}", err);
                     std::process::exit(1);
                 }
@@ -61,15 +60,9 @@ fn console<P: AsRef<Path> + Clone>(
 
         // Note: When reloading there isn't a strict order of messages sent from the server
         match (&message, &paths) {
-            // Only forward `Answer::AnswerReload` messages if watching
+            // Reload changes if the save gets reloaded while in watch mode
             (Answer::AnswerReload(_), Some(paths)) => {
-                // Reload all objects so that script changes get applied
                 app::reload(api, paths, ReloadArgs { guid: None })?;
-
-                if let Ok(mut stream) = TcpStream::connect("127.0.0.1:39997") {
-                    stream.write_all(buffer.as_bytes())?;
-                    stream.flush()?;
-                }
             }
 
             // Print all messages
@@ -111,12 +104,7 @@ impl Message for Answer {
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
 /// This thread uses its own `ExternalEditorApi` listening to port 39997.
-fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<Infallible> {
-    // Constructs a new `ExternalEditorApi` listening to port 39997
-    let api = tts_external_api::ExternalEditorApi {
-        listener: TcpListener::bind("127.0.0.1:39997")?,
-    };
-
+fn watch<P: AsRef<Path>>(api: &ExternalEditorApi, paths: &[P]) -> Result<Infallible> {
     // Create notify watcher
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher = debouncer::new_debouncer(Duration::from_millis(500), tx)?;
@@ -137,7 +125,9 @@ fn watch<P: AsRef<Path>>(paths: &[P]) -> Result<Infallible> {
                     .collect_vec();
 
                 if !paths.is_empty() {
-                    app::reload(&api, &paths, ReloadArgs { guid: None })?
+                    // Send ReloadMessage. Waiting for an answer would block the thread,
+                    // because the tcp listener is already in use.
+                    api.send(MessageReload::new(json!([])).as_message())?;
                 }
             }
             Err(err) => error!("{}", err),
