@@ -116,5 +116,6 @@ fn run(args: Cli) -> Result<()> {
         Commands::Watch { paths } => console::start(&api, Some(&paths)),
         Commands::Backup { path } => app::backup(&api, path)?,
     }
+
     Ok(())
 }

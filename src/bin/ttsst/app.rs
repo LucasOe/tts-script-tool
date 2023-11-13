@@ -84,6 +84,9 @@ pub fn reload<P: AsRef<Path> + Clone>(
 ) -> Result<()> {
     let mut save = Save::read(api)?;
 
+    // Clear screen and put the cursor at the first row and first column of the screen.
+    print!("\x1B[2J\x1B[1;1H");
+
     let mut has_changed = false;
     for path in &paths.reduce::<Vec<_>>() {
         // Reload objects
@@ -107,6 +110,7 @@ pub fn reload<P: AsRef<Path> + Clone>(
         update_global_files(&mut save, paths)?;
         update_save(api, &mut save)?;
     }
+
     Ok(())
 }
 
@@ -241,7 +245,7 @@ pub fn update_save(api: &ExternalEditorApi, save: &mut Save) -> Result<()> {
 
     // Reload save
     api.reload(serde_json::json!(objects))?;
-    info!("reloaded {}", save.name.blue());
+    info!("reloading {}", save.name.blue());
     Ok(())
 }
 
