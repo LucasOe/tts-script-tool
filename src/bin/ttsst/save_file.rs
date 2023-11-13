@@ -37,12 +37,11 @@ impl SaveFile {
     ///
     /// If `self` contains an empty `lua_script` or `xml_ui` string,
     /// the function will cause a connection error.
-    pub fn write(&self, api: &ExternalEditorApi) -> Result<()> {
-        let save_path = PathBuf::from(api.get_scripts()?.save_path);
-        let file = fs::File::create(&save_path)?;
+    pub fn write(&self) -> Result<()> {
+        let file = fs::File::create(&self.path)?;
         let writer = io::BufWriter::new(file);
 
-        debug!("trying to write save to {}", save_path.display());
+        debug!("trying to write save to {}", self.path.display());
         serde_json::to_writer_pretty(writer, &self.save).map_err(|err| err.into())
     }
 }

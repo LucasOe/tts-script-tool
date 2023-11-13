@@ -94,13 +94,6 @@ impl SaveFile {
                     has_changed |= object.reload_object(path)?;
                 }
             }
-
-            // TODO: The watch thread does not call this function anymore
-            // Add the paths as a component tag, so that in watch mode reloaded paths
-            // will show up as tags.
-            if let Ok(tag) = Tag::try_from(path.as_ref()) {
-                has_changed |= self.save.push_object_tag(tag);
-            }
         }
 
         if has_changed {
@@ -145,7 +138,7 @@ impl SaveFile {
         self.save.remove_object_tags();
 
         // Overwrite the save file with the modified objects
-        self.write(api)?;
+        self.write()?;
 
         // Add global lua_script and xml_ui to save
         let mut objects = self.save.objects.to_values();
