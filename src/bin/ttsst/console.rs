@@ -25,7 +25,7 @@ where
     // Note: `std::process::exit` terminates all running threads
     std::thread::scope(|scope| {
         scope.spawn(move || {
-            if let Err(err) = read(api, paths) {
+            if let Err(err) = read(&save_file, api, paths) {
                 error!("{}", err);
                 std::process::exit(1);
             }
@@ -44,7 +44,7 @@ where
 
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
-fn read<P: AsRef<Path>>(api: &Api, paths: Option<&[P]>) -> Result<Infallible>
+fn read<P: AsRef<Path>>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>) -> Result<Infallible>
 where
     P: Clone,
 {
@@ -53,12 +53,16 @@ where
 
         // Reload changes if the save gets reloaded while in watch mode
         if let (Answer::AnswerReload(answer), Some(paths)) = (&message, &paths) {
-            let mut save_file = SaveFile::read_from_path(&answer.save_path)?;
+            let mut answer_save_file = SaveFile::read_from_path(&answer.save_path)?;
 
-            // Clear screen and put the cursor at the first row and first column of the screen.
-            print!("\x1B[2J\x1B[1;1H");
+            if answer_save_file.path == save_file.path {
+                // Clear screen and put the cursor at the first row and first column of the screen.
+                print!("\x1B[2J\x1B[1;1H");
 
-            save_file.reload(api, paths, ReloadArgs { guid: None })?;
+                answer_save_file.reload(api, paths, ReloadArgs { guid: None })?;
+            } else {
+                error!("Different save file has been loaded!");
+            }
         }
 
         // Print all messages
