@@ -11,8 +11,10 @@ use notify_debouncer_mini::{self as debouncer};
 use serde_json::json;
 use tts_external_api::messages::{Answer, MessageReload};
 use tts_external_api::ExternalEditorApi;
+use ttsst::save::SaveFile;
 
-use crate::{app, ReloadArgs};
+use crate::app::SaveFileExt;
+use crate::ReloadArgs;
 
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
@@ -47,8 +49,12 @@ fn console<P: AsRef<Path> + Clone>(
         let message = api.read();
 
         // Reload changes if the save gets reloaded while in watch mode
-        if let (Answer::AnswerReload(_), Some(paths)) = (&message, &paths) {
-            app::reload(api, paths, ReloadArgs { guid: None })?;
+        if let (Answer::AnswerReload(answer), Some(paths)) = (&message, &paths) {
+            // Clear screen and put the cursor at the first row and first column of the screen.
+            print!("\x1B[2J\x1B[1;1H");
+
+            let mut save = SaveFile::read_from_path(&answer.save_path)?;
+            save.reload(api, paths, ReloadArgs { guid: None })?;
         }
 
         // Print all messages
