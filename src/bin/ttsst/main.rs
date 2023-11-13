@@ -109,15 +109,15 @@ fn run(args: Cli) -> Result<()> {
     })?;
 
     let api = tts_external_api::ExternalEditorApi::new();
-    let mut save = SaveFile::read(&api)?;
+    let mut save_file = SaveFile::read(&api)?;
 
     match args.command {
-        Commands::Attach { path, guids } => save.attach(&api, path, guids)?,
-        Commands::Detach { guids } => save.detach(&api, guids)?,
-        Commands::Reload { paths, args } => save.reload(&api, &paths, args)?,
-        Commands::Console => console::start::<PathBuf>(&api, None),
-        Commands::Watch { paths } => console::start(&api, Some(&paths)),
-        Commands::Backup { path } => save.backup(path)?,
+        Commands::Attach { path, guids } => save_file.attach(&api, path, guids)?,
+        Commands::Detach { guids } => save_file.detach(&api, guids)?,
+        Commands::Reload { paths, args } => save_file.reload(&api, &paths, args)?,
+        Commands::Console => console::start(&save_file, &api, None::<&[PathBuf]>),
+        Commands::Watch { paths } => console::start(&save_file, &api, Some(&paths)),
+        Commands::Backup { path } => save_file.backup(path)?,
     }
 
     Ok(())
