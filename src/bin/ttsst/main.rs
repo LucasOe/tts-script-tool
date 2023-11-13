@@ -6,8 +6,9 @@ mod parser;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
+use ttsst::save::SaveFile;
 
-use crate::logger::ConsoleLogger;
+use crate::{app::SaveFileExt, logger::ConsoleLogger};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -108,13 +109,15 @@ fn run(args: Cli) -> Result<()> {
     })?;
 
     let api = tts_external_api::ExternalEditorApi::new();
+    let mut save = SaveFile::read(&api)?;
+
     match args.command {
-        Commands::Attach { path, guids } => app::attach(&api, path, guids)?,
-        Commands::Detach { guids } => app::detach(&api, guids)?,
-        Commands::Reload { paths, args } => app::reload(&api, &paths, args)?,
+        Commands::Attach { path, guids } => save.attach(&api, path, guids)?,
+        Commands::Detach { guids } => save.detach(&api, guids)?,
+        Commands::Reload { paths, args } => save.reload(&api, &paths, args)?,
         Commands::Console => console::start::<PathBuf>(&api, None),
         Commands::Watch { paths } => console::start(&api, Some(&paths)),
-        Commands::Backup { path } => app::backup(&api, path)?,
+        Commands::Backup { path } => save.backup(path)?,
     }
 
     Ok(())

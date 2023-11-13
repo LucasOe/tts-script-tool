@@ -54,6 +54,16 @@ impl Objects {
             .ok_or(format!("{} does not exist", guid.as_ref().yellow()).into())
     }
 
+    /// Once an `Result::Err` is found, the iteration will terminate and return the result.
+    /// If `guids` only contains existing objects, a vec with the savestate of those objects will be returned.
+    pub fn find_objects<T: AsRef<str>>(&self, guids: &[T]) -> Result<Self> {
+        guids
+            .as_ref()
+            .iter()
+            .map(|guid| self.find_object(guid).cloned())
+            .collect() // `Vec<Result<T, E>>` gets turned into `Result<Vec<T>, E>`
+    }
+
     /// Filter out `HandTrigger`, `FogOfWar` and `FogOfWarTrigger` objects.
     ///
     /// For a list of object names see:
