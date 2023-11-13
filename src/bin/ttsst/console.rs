@@ -37,15 +37,6 @@ pub fn start<P: AsRef<Path> + Clone + Sync>(api: &ExternalEditorApi, paths: Opti
     });
 }
 
-struct ComparableAnswer(Answer);
-
-impl PartialEq for ComparableAnswer {
-    fn eq(&self, other: &Self) -> bool {
-        // Compare the Enum variant
-        std::mem::discriminant(&self.0) == std::mem::discriminant(&other.0)
-    }
-}
-
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
 fn console<P: AsRef<Path> + Clone>(
