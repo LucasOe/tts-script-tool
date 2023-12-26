@@ -9,9 +9,9 @@ use itertools::Itertools;
 use log::*;
 use path_slash::PathExt;
 use tts_external_api::ExternalEditorApi as Api;
-use ttsst::Save;
-use ttsst::{Object, Objects, Tag};
+use ttsst::{Object, Objects, Save, Tag};
 
+use crate::utils::Reduce;
 use crate::{Guids, ReloadArgs};
 
 pub enum Mode {
@@ -356,30 +356,6 @@ fn inquire_select<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
     match inquire::Select::new("Select a Global file to use:", display_paths).prompt() {
         Ok(path) => Ok(path.0.as_ref().to_path_buf()),
         Err(err) => Err(err.into()),
-    }
-}
-
-trait Reduce<P> {
-    /// Filters and deduplicates the collection of paths, returning a new collection.
-    ///
-    /// This method removes duplicate paths based on their logical content and ensures that
-    /// subfolders are not included if a parent folder is present in the collection.
-    fn reduce<T: FromIterator<P>>(&self) -> T;
-}
-
-impl<U: AsRef<[P]>, P: AsRef<Path> + Clone> Reduce<P> for U {
-    fn reduce<T: FromIterator<P>>(&self) -> T {
-        self.as_ref()
-            .iter()
-            .unique_by(|path| path.as_ref().to_path_buf())
-            .filter(|&this| {
-                !self.as_ref().iter().any(|other| {
-                    let paths = (this.as_ref(), other.as_ref());
-                    paths.0 != paths.1 && paths.0.starts_with(paths.1)
-                })
-            })
-            .cloned()
-            .collect()
     }
 }
 
