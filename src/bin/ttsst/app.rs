@@ -14,18 +14,9 @@ use ttsst::{Object, Objects, Save, Tag};
 use crate::utils::Reduce;
 use crate::{Guids, ReloadArgs};
 
-pub enum Mode {
+enum Mode {
     Attach,
     Detach,
-}
-
-impl Mode {
-    pub fn msg(&self) -> &str {
-        match self {
-            Mode::Attach => "Select the object to attach the script or ui element to:",
-            Mode::Detach => "Select the object to detach the script and ui element from:",
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -289,9 +280,14 @@ fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
 /// If no guids are provided show a selection of objects in the current savestate.
 /// Otherwise ensure that the guids provided exist.
 fn get_objects(objects: &Objects, guids: Guids, mode: Mode) -> Result<Objects> {
+    let message = match mode {
+        Mode::Attach => "Select the object to attach the script or ui element to:",
+        Mode::Detach => "Select the object to detach the script and ui element from:",
+    };
+
     match guids.guids {
         Some(guids) => objects.find_objects(&guids).map_err(|err| err.into()),
-        None => select_objects(objects, mode.msg(), guids.all),
+        None => select_objects(objects, message, guids.all),
     }
 }
 
