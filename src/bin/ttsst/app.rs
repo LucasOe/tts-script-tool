@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use anyhow::Result;
 use colored::Colorize;
@@ -9,9 +9,9 @@ use itertools::Itertools;
 use log::*;
 use path_slash::PathExt;
 use tts_external_api::ExternalEditorApi as Api;
+use ttsst::Save;
 use ttsst::{Object, Objects, Tag};
 
-use crate::save_file::SaveFile;
 use crate::{Guids, ReloadArgs};
 
 pub enum Mode {
@@ -28,11 +28,49 @@ impl Mode {
     }
 }
 
+#[derive(Debug)]
+pub struct SaveFile {
+    pub save: Save,
+    pub path: PathBuf,
+}
+
+impl SaveFile {
+    /// Reads the currently open save file and returns it as a `SaveFile`.
+    pub fn read(api: &Api) -> Result<Self> {
+        let save_path = PathBuf::from(&api.get_scripts()?.save_path);
+        SaveFile::read_from_path(save_path)
+    }
+
+    // Reads a save from a path and returns it as a `SaveFile`.
+    pub fn read_from_path<P: AsRef<Path> + Into<PathBuf>>(save_path: P) -> Result<Self> {
+        let file = fs::File::open(&save_path)?;
+        let reader = io::BufReader::new(file);
+
+        debug!("trying to read save from {}", save_path.as_ref().display());
+        Ok(Self {
+            save: serde_json::from_reader(reader)?,
+            path: save_path.into(),
+        })
+    }
+
+    /// Writes `self` to the save file that is currently loaded ingame.
+    ///
+    /// If `self` contains an empty `lua_script` or `xml_ui` string,
+    /// the function will cause a connection error.
+    pub fn write(&self) -> Result<()> {
+        let file = fs::File::create(&self.path)?;
+        let writer = io::BufWriter::new(file);
+
+        debug!("trying to write save to {}", self.path.display());
+        serde_json::to_writer_pretty(writer, &self.save).map_err(|err| err.into())
+    }
+}
+
 impl SaveFile {
     /// Attaches the script to an object by adding the script tag and the script,
     /// and then reloads the save.
     pub fn attach<P: AsRef<Path>>(&mut self, api: &Api, path: P, guids: Guids) -> Result<()> {
-        let mut objects = self.save.objects.get_objects(guids, Mode::Attach)?;
+        let mut objects = get_objects(&self.save.objects, guids, Mode::Attach)?;
 
         let tag = Tag::try_from(path.as_ref())?;
         let file = read_file(path)?;
@@ -62,7 +100,7 @@ impl SaveFile {
 
     // Detaches a script and removes all valid tags from an object.
     pub fn detach(&mut self, api: &Api, guids: Guids) -> Result<()> {
-        let mut objects = self.save.objects.get_objects(guids, Mode::Detach)?;
+        let mut objects = get_objects(&self.save.objects, guids, Mode::Detach)?;
 
         // Remove tags and script from objects
         for object in objects.iter_mut() {
@@ -88,10 +126,10 @@ impl SaveFile {
             // Reload objects
             if let Some(guid) = &args.guid {
                 let object = self.save.objects.find_object_mut(guid)?;
-                has_changed |= object.reload_object(path)?;
+                has_changed |= reload_object(object, path)?;
             } else {
                 for object in self.save.objects.iter_mut() {
-                    has_changed |= object.reload_object(path)?;
+                    has_changed |= reload_object(object, path)?;
                 }
             }
         }
@@ -169,7 +207,7 @@ impl SaveFile {
             .unique_by(|path| path.as_ref().to_path_buf())
             .collect_vec();
 
-        if let Some(path) = unique_paths.get_global_path(GLOBAL_LUA)? {
+        if let Some(path) = get_global_path(&unique_paths, GLOBAL_LUA)? {
             let file = read_file(&path)?;
             let lua_script = match file.is_empty() {
                 #[rustfmt::skip]
@@ -184,7 +222,7 @@ impl SaveFile {
         };
 
         // Update xml_ui
-        if let Some(path) = unique_paths.get_global_path(GLOBAL_XML)? {
+        if let Some(path) = get_global_path(&unique_paths, GLOBAL_XML)? {
             let file: String = read_file(&path)?;
             let xml_ui = match file.is_empty() {
                 #[rustfmt::skip]
@@ -202,141 +240,122 @@ impl SaveFile {
     }
 }
 
-trait ObjectExt {
-    /// Reload the lua script and xml ui of an `object`, if its tag matches the `path`
-    fn reload_object<P: AsRef<Path>>(&mut self, path: P) -> Result<bool>;
-}
-
-impl ObjectExt for Object {
-    fn reload_object<P: AsRef<Path>>(&mut self, path: P) -> Result<bool> {
-        // Update lua scripts if the path is a lua file
-        let lua_change = match self.valid_lua()? {
-            Some(tag) if tag.starts_with(&path) => {
-                let file = read_file(tag.path()?)?;
-                if self.lua_script != file {
-                    self.lua_script = file;
-                    info!("updated {self}");
-                    true
-                } else {
-                    false
-                }
-            }
-            // Remove lua script if the objects has no valid tag
-            None if !self.lua_script.is_empty() => {
-                self.lua_script = "".to_string();
-                info!("removed lua script from {}", self);
+/// Reload the lua script and xml ui of an `object`, if its tag matches the `path`
+fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
+    // Update lua scripts if the path is a lua file
+    let lua_change = match object.valid_lua()? {
+        Some(tag) if tag.starts_with(&path) => {
+            let file = read_file(tag.path()?)?;
+            if object.lua_script != file {
+                object.lua_script = file;
+                info!("updated {object}");
                 true
+            } else {
+                false
             }
-            _ => false,
-        };
-        // Update xml ui if the path is a xml file
-        let xml_change = match self.valid_xml()? {
-            Some(tag) if tag.starts_with(&path) => {
-                let file = read_file(tag.path()?)?;
-                if self.xml_ui != file {
-                    self.xml_ui = read_file(tag.path()?)?;
-                    info!("updated {self}");
-                    true
-                } else {
-                    false
-                }
-            }
-            // Remove xml ui if the objects has no valid tag
-            None if !self.xml_ui.is_empty() => {
-                self.xml_ui = "".to_string();
-                info!("removed xml ui from {}", self);
+        }
+        // Remove lua script if the objects has no valid tag
+        None if !object.lua_script.is_empty() => {
+            object.lua_script = "".to_string();
+            info!("removed lua script from {}", object);
+            true
+        }
+        _ => false,
+    };
+    // Update xml ui if the path is a xml file
+    let xml_change = match object.valid_xml()? {
+        Some(tag) if tag.starts_with(&path) => {
+            let file = read_file(tag.path()?)?;
+            if object.xml_ui != file {
+                object.xml_ui = read_file(tag.path()?)?;
+                info!("updated {object}");
                 true
+            } else {
+                false
             }
-            _ => false,
-        };
-
-        Ok(lua_change || xml_change)
-    }
-}
-
-trait ObjectsExt {
-    /// If no guids are provided show a selection of objects in the current savestate.
-    /// Otherwise ensure that the guids provided exist.
-    fn get_objects(&self, guids: Guids, mode: Mode) -> Result<Objects>;
-
-    /// Shows a multi selection prompt of objects loaded in the current save
-    fn select_objects(&self, message: &str, show_all: bool) -> Result<Objects>;
-}
-
-impl ObjectsExt for Objects {
-    fn get_objects(&self, guids: Guids, mode: Mode) -> Result<Objects> {
-        match guids.guids {
-            Some(guids) => self.find_objects(&guids).map_err(|err| err.into()),
-            None => self.select_objects(mode.msg(), guids.all),
         }
-    }
-
-    fn select_objects(&self, message: &str, show_all: bool) -> Result<Objects> {
-        let objects = match show_all {
-            true => self.clone(),
-            false => self.clone().filter_hidden(),
-        };
-
-        match inquire::MultiSelect::new(message, objects.into_inner()).prompt() {
-            Ok(obj) => Ok(obj.into()),
-            Err(err) => Err(err.into()),
+        // Remove xml ui if the objects has no valid tag
+        None if !object.xml_ui.is_empty() => {
+            object.xml_ui = "".to_string();
+            info!("removed xml ui from {}", object);
+            true
         }
+        _ => false,
+    };
+
+    Ok(lua_change || xml_change)
+}
+
+/// If no guids are provided show a selection of objects in the current savestate.
+/// Otherwise ensure that the guids provided exist.
+fn get_objects(objects: &Objects, guids: Guids, mode: Mode) -> Result<Objects> {
+    match guids.guids {
+        Some(guids) => objects.find_objects(&guids).map_err(|err| err.into()),
+        None => select_objects(objects, mode.msg(), guids.all),
     }
 }
 
-trait PathsExt {
-    /// Returns a path to a global script, by joining `paths` and `files`.
-    fn get_global_path<T: AsRef<str>>(&self, files: &[T]) -> Result<Option<PathBuf>>;
+/// Shows a multi selection prompt of objects loaded in the current save
+fn select_objects(objects: &Objects, message: &str, show_all: bool) -> Result<Objects> {
+    let objects = match show_all {
+        true => objects.clone(),
+        false => objects.clone().filter_hidden(),
+    };
 
-    /// Shows a multi selection prompt of `paths`
-    fn inquire_select(&self) -> Result<PathBuf>;
+    match inquire::MultiSelect::new(message, objects.into_inner()).prompt() {
+        Ok(obj) => Ok(obj.into()),
+        Err(err) => Err(err.into()),
+    }
 }
 
-impl<P: AsRef<Path>> PathsExt for [P] {
-    fn get_global_path<T: AsRef<str>>(&self, files: &[T]) -> Result<Option<PathBuf>> {
-        // Returns a list of joined `paths` and `files` that exist
-        let joined_paths = self
-            .iter()
-            .flat_map(|path| {
-                files
-                    .iter()
-                    .filter_map(|file| {
-                        let path = path.as_ref();
-                        let file = file.as_ref();
-                        match path.is_dir() {
-                            // If path is a dir, join `file`
-                            true => Some(path.join(file)),
-                            // If path ends with `file`, it is a global file
-                            false if path.file_name() == Some(OsStr::new(file)) => {
-                                Some(path.to_path_buf())
-                            }
-                            // if path is a file that doesn't end with `file`, ignore it
-                            false => None,
+/// Returns a path to a global script, by joining `paths` and `files`.
+fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
+    paths: &[P],
+    files: &[T],
+) -> Result<Option<PathBuf>> {
+    // Returns a list of joined `paths` and `files` that exist
+    let joined_paths = paths
+        .iter()
+        .flat_map(|path| {
+            files
+                .iter()
+                .filter_map(|file| {
+                    let path = path.as_ref();
+                    let file = file.as_ref();
+                    match path.is_dir() {
+                        // If path is a dir, join `file`
+                        true => Some(path.join(file)),
+                        // If path ends with `file`, it is a global file
+                        false if path.file_name() == Some(OsStr::new(file)) => {
+                            Some(path.to_path_buf())
                         }
-                    })
-                    .filter(|path| path.exists())
-                    .collect_vec()
-            })
-            .collect_vec();
+                        // if path is a file that doesn't end with `file`, ignore it
+                        false => None,
+                    }
+                })
+                .filter(|path| path.exists())
+                .collect_vec()
+        })
+        .collect_vec();
 
-        match joined_paths.len() {
-            0 | 1 => Ok(joined_paths.get(0).map(ToOwned::to_owned)),
-            _ => joined_paths.inquire_select().map(Option::Some),
-        }
+    match joined_paths.len() {
+        0 | 1 => Ok(joined_paths.get(0).map(ToOwned::to_owned)),
+        _ => inquire_select(paths).map(Option::Some),
     }
+}
 
-    fn inquire_select(&self) -> Result<PathBuf> {
-        #[derive(Display)]
-        #[display(fmt = "'{}'", "self.0.as_ref().to_slash_lossy().yellow()")]
-        struct DisplayPath<P: AsRef<Path>>(P);
+/// Shows a multi selection prompt of `paths`
+fn inquire_select<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
+    #[derive(Display)]
+    #[display(fmt = "'{}'", "self.0.as_ref().to_slash_lossy().yellow()")]
+    struct DisplayPath<P: AsRef<Path>>(P);
 
-        // Wrap `paths` in `DisplayPath` so they can be displayed by the inquire prompt
-        let display_paths = self.iter().map(DisplayPath).collect_vec();
+    // Wrap `paths` in `DisplayPath` so they can be displayed by the inquire prompt
+    let display_paths = paths.iter().map(DisplayPath).collect_vec();
 
-        match inquire::Select::new("Select a Global file to use:", display_paths).prompt() {
-            Ok(path) => Ok(path.0.as_ref().to_path_buf()),
-            Err(err) => Err(err.into()),
-        }
+    match inquire::Select::new("Select a Global file to use:", display_paths).prompt() {
+        Ok(path) => Ok(path.0.as_ref().to_path_buf()),
+        Err(err) => Err(err.into()),
     }
 }
 

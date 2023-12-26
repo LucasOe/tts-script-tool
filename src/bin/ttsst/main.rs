@@ -2,13 +2,12 @@ mod app;
 mod console;
 mod logger;
 mod parser;
-mod save_file;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
-use crate::{logger::ConsoleLogger, save_file::SaveFile};
+use crate::{app::SaveFile, logger::ConsoleLogger};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
