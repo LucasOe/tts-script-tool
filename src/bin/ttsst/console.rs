@@ -1,5 +1,5 @@
 use std::convert::Infallible;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -14,6 +14,7 @@ use tts_external_api::ExternalEditorApi as Api;
 use ttsst::Tag;
 
 use crate::app::SaveFile;
+use crate::utils::StripCurrentDir;
 use crate::ReloadArgs;
 
 /// Show print, log and error messages in the console.
@@ -133,16 +134,5 @@ fn watch<P: AsRef<Path>>(save_file: &SaveFile, api: &Api, paths: &[P]) -> Result
             }
             Err(err) => error!("{}", err),
         }
-    }
-}
-
-trait StripCurrentDir {
-    fn strip_current_dir(&self) -> Result<PathBuf>;
-}
-
-impl StripCurrentDir for PathBuf {
-    fn strip_current_dir(&self) -> Result<PathBuf> {
-        let path = self.strip_prefix(std::env::current_dir()?)?;
-        Ok(PathBuf::from(".\\").join(path))
     }
 }

@@ -2,6 +2,7 @@ mod app;
 mod console;
 mod logger;
 mod parser;
+mod utils;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
