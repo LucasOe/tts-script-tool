@@ -70,14 +70,14 @@ impl SaveFile {
             if tag.is_lua() {
                 object.tags.retain(|tag| !tag.is_lua());
                 object.tags.push(tag.clone());
-                object.lua_script = file.clone();
+                object.lua_script.clone_from(&file);
                 info!("attached script to {object}");
             }
             // Add xml tag to objects
             if tag.is_xml() {
                 object.tags.retain(|tag| !tag.is_xml());
                 object.tags.push(tag.clone());
-                object.xml_ui = file.clone();
+                object.xml_ui.clone_from(&file);
                 info!("attached ui element to {object}");
             }
         }
@@ -108,21 +108,21 @@ impl SaveFile {
 
     /// Updates the scripts for all objects that use a script from `path`,
     /// and then reloads the save.
-    pub fn reload<P: AsRef<Path>>(&mut self, api: &Api, paths: &[P], args: ReloadArgs) -> Result<()>
+    pub fn reload<P>(&mut self, api: &Api, paths: &[P], args: ReloadArgs) -> Result<()>
     where
-        P: Clone,
+        P: AsRef<Path> + Clone,
     {
         let mut has_changed = false;
         for path in &paths.reduce::<Vec<_>>() {
             // If a guid is passed as an argument, reload only that object,
             // otherwise reload all objects in the save.
-            if let Some(guid) = &args.guid {
-                let object = self.save.objects.find_object_mut(guid)?;
-                has_changed |= reload_object(object, path)?;
-            } else {
-                for object in self.save.objects.iter_mut() {
-                    has_changed |= reload_object(object, path)?;
-                }
+            let mut objects = match &args.guid {
+                Some(guid) => vec![self.save.objects.find_object_mut(guid)?],
+                None => self.save.objects.iter_mut().collect(),
+            };
+
+            for object in objects.iter_mut() {
+                has_changed = reload_object(object, path)?;
             }
         }
 
@@ -339,7 +339,7 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
         .collect_vec();
 
     match joined_paths.len() {
-        0 | 1 => Ok(joined_paths.get(0).map(ToOwned::to_owned)),
+        0 | 1 => Ok(joined_paths.first().map(ToOwned::to_owned)),
         _ => inquire_select(paths).map(Option::Some),
     }
 }

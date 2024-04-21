@@ -144,7 +144,7 @@ impl Object {
     pub fn valid_lua(&self) -> Result<Option<Tag>> {
         let valid: Tags = self.tags.iter().filter(|t| t.is_lua()).cloned().collect();
         match valid.len() {
-            0 | 1 => Ok(valid.get(0).cloned()),
+            0 | 1 => Ok(valid.first().cloned()),
             #[rustfmt::skip]
             _ => Err(format!("{} has multiple valid lua tags: {}", self.guid.yellow(), valid).into()),
         }
@@ -156,7 +156,7 @@ impl Object {
     pub fn valid_xml(&self) -> Result<Option<Tag>> {
         let valid: Tags = self.tags.iter().filter(|t| t.is_xml()).cloned().collect();
         match valid.len() {
-            0 | 1 => Ok(valid.get(0).cloned()),
+            0 | 1 => Ok(valid.first().cloned()),
             #[rustfmt::skip]
             _ => Err(format!("{} has multiple valid xml tags: {}", self.guid.yellow(), valid).into()),
         }

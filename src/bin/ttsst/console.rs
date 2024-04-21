@@ -6,7 +6,7 @@ use anyhow::Result;
 use colored::*;
 use itertools::Itertools;
 use log::*;
-use notify::{self, RecursiveMode};
+use notify::RecursiveMode;
 use notify_debouncer_mini::{self as debouncer};
 use serde_json::json;
 use tts_external_api::messages::{Answer, MessageReload};
@@ -19,14 +19,14 @@ use crate::ReloadArgs;
 
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
-pub fn start<P: AsRef<Path>>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>)
+pub fn start<P>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>)
 where
-    P: Clone + Sync,
+    P: AsRef<Path> + Clone + Sync,
 {
     // Note: `std::process::exit` terminates all running threads
     std::thread::scope(|scope| {
         scope.spawn(move || {
-            if let Err(err) = read(&save_file, api, paths) {
+            if let Err(err) = read(save_file, api, paths) {
                 error!("{}", err);
                 std::process::exit(1);
             }
@@ -34,7 +34,7 @@ where
 
         if let Some(paths) = paths {
             scope.spawn(move || {
-                if let Err(err) = watch(&save_file, api, paths) {
+                if let Err(err) = watch(save_file, api, paths) {
                     error!("{}", err);
                     std::process::exit(1);
                 }
@@ -45,9 +45,9 @@ where
 
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
-fn read<P: AsRef<Path>>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>) -> Result<Infallible>
+fn read<P>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>) -> Result<Infallible>
 where
-    P: Clone,
+    P: AsRef<Path> + Clone,
 {
     loop {
         let message = api.read();
