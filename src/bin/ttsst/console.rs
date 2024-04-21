@@ -54,22 +54,18 @@ where
 
         // Reload changes if the save gets reloaded while in watch mode
         if let (Answer::AnswerReload(answer), Some(paths)) = (&message, &paths) {
+            // Check if the save file of the incoming answer is still the same save file
             let mut answer_save_file = SaveFile::read_from_path(&answer.save_path)?;
-
-            if answer_save_file.path == save_file.path {
-                // Clear screen and put the cursor at the first row and first column of the screen.
-                print!("\x1B[2J\x1B[1;1H");
-
-                answer_save_file.reload(api, paths, ReloadArgs { guid: None })?;
-            } else {
+            if answer_save_file.path != save_file.path {
                 error!("Different save file has been loaded!");
             }
+
+            // Clear screen and put the cursor at the first row and first column of the screen
+            print!("\x1B[2J\x1B[1;1H");
+            answer_save_file.reload(api, paths, ReloadArgs { guid: None })?;
         }
 
-        // Print all messages
-        //
-        // Skips `Answer::AnswerReload` when watching, otherwise reloading
-        // would cause multiple messages to print
+        // Print messages
         if let Some(msg) = message.message() {
             let time = chrono::Local::now().format("%H:%M:%S").to_string();
             println!("[{}] {}", time.bright_white(), msg);
@@ -115,15 +111,14 @@ fn watch<P: AsRef<Path>>(save_file: &SaveFile, api: &Api, paths: &[P]) -> Result
                     .collect_vec();
 
                 if !paths.is_empty() {
-                    // Send ReloadMessage. Waiting for an answer would block the thread,
-                    // because the tcp listener is already in use.
+                    // Send ReloadMessage using `api.send` instead of `api.reload`,
+                    // because waiting for an answer would block the thread since the TCP socket is already in use.
                     api.send(MessageReload::new(json!([])).as_message())?;
 
-                    // Add the paths as a component tag, so that in watch mode reloaded paths
-                    // will show up as tags.
+                    // Add the paths as a component tag, so that reloaded paths will show up as tags.
+                    // Then update the save file.
                     for path in paths {
                         if let Ok(tag) = Tag::try_from(path.as_ref()) {
-                            // Update save_file
                             let mut save_file = SaveFile::read_from_path(&save_file.path)?;
                             if save_file.save.push_object_tag(tag) {
                                 save_file.write()?;

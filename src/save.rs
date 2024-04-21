@@ -33,7 +33,7 @@ pub struct Save {
 }
 
 impl Save {
-    // Add `tag` to `self`, if it isn't already included in the labels or object tags
+    /// Add `tag` to `self`, if it isn't already included in the labels or object tags
     pub fn push_object_tag(&mut self, tag: Tag) -> bool {
         let label = Label::from(tag.clone());
         let objects_include = self
@@ -50,7 +50,7 @@ impl Save {
         }
     }
 
-    // Remove component tags that exist as object tags
+    /// Remove component tags that exist as object tags
     pub fn remove_object_tags(&mut self) {
         self.tags.labels.retain(|label| {
             !self.objects.iter().any(|object| {
