@@ -122,7 +122,7 @@ impl SaveFile {
             };
 
             for object in objects.iter_mut() {
-                has_changed = reload_object(object, path)?;
+                has_changed |= reload_object(object, path)?;
             }
         }
 
