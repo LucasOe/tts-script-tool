@@ -114,7 +114,8 @@ impl SaveFile {
     {
         let mut has_changed = false;
         for path in &paths.reduce::<Vec<_>>() {
-            // Reload objects
+            // If a guid is passed as an argument, reload only that object,
+            // otherwise reload all objects in the save.
             if let Some(guid) = &args.guid {
                 let object = self.save.objects.find_object_mut(guid)?;
                 has_changed |= reload_object(object, path)?;
@@ -125,6 +126,8 @@ impl SaveFile {
             }
         }
 
+        // The save only gets updated if an objects has changed to to avoid a loop
+        // in which every reload triggers another reload while watching.
         if has_changed {
             self.update_global_files(paths)?;
             self.update(api)?;
@@ -231,7 +234,8 @@ impl SaveFile {
     }
 }
 
-/// Reload the lua script and xml ui of an `object`, if its tag matches the `path`
+/// Reload the lua script and xml ui of an `object`, if its tag matches the `path`.
+/// Returns `true` if the object has changed.
 fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
     // Update lua scripts if the path is a lua file
     let lua_change = match object.valid_lua()? {
@@ -258,7 +262,7 @@ fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
         Some(tag) if tag.starts_with(&path) => {
             let file = read_file(tag.path()?)?;
             if object.xml_ui != file {
-                object.xml_ui = read_file(tag.path()?)?;
+                object.xml_ui = file;
                 info!("updated {object}");
                 true
             } else {
