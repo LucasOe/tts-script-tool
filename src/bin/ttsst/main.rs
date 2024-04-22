@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 mod app;
 mod console;
 mod logger;
@@ -112,13 +114,11 @@ fn run(args: Cli) -> Result<()> {
     let mut save_file = SaveFile::read(&api)?;
 
     match args.command {
-        Commands::Attach { path, guids } => save_file.attach(&api, path, guids)?,
-        Commands::Detach { guids } => save_file.detach(&api, guids)?,
-        Commands::Reload { paths, args } => save_file.reload(&api, &paths, args)?,
-        Commands::Console => console::start(&save_file, &api, None::<&[PathBuf]>),
-        Commands::Watch { paths } => console::start(&save_file, &api, Some(&paths)),
-        Commands::Backup { path } => save_file.backup(path)?,
+        Commands::Attach { path, guids } => save_file.attach(&api, path, guids),
+        Commands::Detach { guids } => save_file.detach(&api, guids),
+        Commands::Reload { paths, args } => save_file.reload(&api, &paths, args),
+        Commands::Console => console::start(&save_file, &api, None::<&[PathBuf]>)?,
+        Commands::Watch { paths } => console::start(&save_file, &api, Some(&paths))?,
+        Commands::Backup { path } => save_file.backup(path),
     }
-
-    Ok(())
 }

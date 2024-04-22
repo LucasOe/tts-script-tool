@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::path::Path;
 use std::time::Duration;
 
@@ -19,33 +18,19 @@ use crate::ReloadArgs;
 
 /// Show print, log and error messages in the console.
 /// If `--watch` mode is enabled, files in that directory will we watched and reloaded on change.
-pub fn start<P>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>)
+pub fn start<P>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>) -> Result<!>
 where
     P: AsRef<Path> + Clone + Sync,
 {
-    // Note: `std::process::exit` terminates all running threads
-    std::thread::scope(|scope| {
-        scope.spawn(move || {
-            if let Err(err) = read(save_file, api, paths) {
-                error!("{}", err);
-                std::process::exit(1);
-            }
-        });
-
-        if let Some(paths) = paths {
-            scope.spawn(move || {
-                if let Err(err) = watch(save_file, api, paths) {
-                    error!("{}", err);
-                    std::process::exit(1);
-                }
-            });
-        }
-    });
+    std::thread::scope(|scope| match paths {
+        Some(paths) => scope.spawn(|| watch(save_file, api, paths)).join().unwrap(),
+        None => scope.spawn(|| read(save_file, api, paths)).join().unwrap(),
+    })
 }
 
 /// Spawns a new thread that listens to the print, log and error messages in the console.
 /// All messages get forwarded to port 39997 so that they can be used again.
-fn read<P>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>) -> Result<Infallible>
+fn read<P>(save_file: &SaveFile, api: &Api, paths: Option<&[P]>) -> Result<!>
 where
     P: AsRef<Path> + Clone,
 {
@@ -90,7 +75,7 @@ impl Message for Answer {
 
 /// Spawns a new thread that listens to file changes in the `watch` directory.
 /// This thread uses its own `ExternalEditorApi` listening to port 39997.
-fn watch<P: AsRef<Path>>(save_file: &SaveFile, api: &Api, paths: &[P]) -> Result<Infallible> {
+fn watch<P: AsRef<Path>>(save_file: &SaveFile, api: &Api, paths: &[P]) -> Result<!> {
     // Create notify watcher
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher = debouncer::new_debouncer(Duration::from_millis(500), tx)?;
