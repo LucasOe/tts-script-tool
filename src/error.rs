@@ -14,7 +14,7 @@ pub enum Error {
 
 impl From<&str> for Error {
     fn from(s: &str) -> Self {
-        Error::Msg(s.to_owned())
+        Error::Msg(s.into())
     }
 }
 

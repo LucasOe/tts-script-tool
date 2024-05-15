@@ -198,14 +198,14 @@ impl SaveFile {
         // Filter out duplicates
         let unique_paths = paths
             .iter()
-            .unique_by(|path| path.as_ref().to_path_buf())
+            .unique_by(|path| path.as_ref().to_owned())
             .collect_vec();
 
         if let Some(path) = get_global_path(&unique_paths, GLOBAL_LUA)? {
             let file = read_file(&path)?;
             let lua_script = match file.is_empty() {
                 #[rustfmt::skip]
-                true => "--[[ Lua code. See documentation: https://api.tabletopsimulator.com/ --]]".to_string(),
+                true => "--[[ Lua code. See documentation: https://api.tabletopsimulator.com/ --]]".into(),
                 false => file,
             };
             if self.save.lua_script != lua_script {
@@ -220,7 +220,7 @@ impl SaveFile {
             let file: String = read_file(&path)?;
             let xml_ui = match file.is_empty() {
                 #[rustfmt::skip]
-                true => "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->".to_string(),
+                true => "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->".into(),
                 false => file,
             };
             if self.save.xml_ui != xml_ui {
@@ -251,7 +251,7 @@ fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
         }
         // Remove lua script if the objects has no valid tag
         None if !object.lua_script.is_empty() => {
-            object.lua_script = "".to_string();
+            object.lua_script = "".into();
             info!("removed lua script from {}", object);
             true
         }
@@ -271,7 +271,7 @@ fn reload_object<P: AsRef<Path>>(object: &mut Object, path: P) -> Result<bool> {
         }
         // Remove xml ui if the objects has no valid tag
         None if !object.xml_ui.is_empty() => {
-            object.xml_ui = "".to_string();
+            object.xml_ui = "".into();
             info!("removed xml ui from {}", object);
             true
         }
@@ -326,9 +326,7 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
                         // If path is a dir, join `file`
                         true => Some(path.join(file)),
                         // If path ends with `file`, it is a global file
-                        false if path.file_name() == Some(OsStr::new(file)) => {
-                            Some(path.to_path_buf())
-                        }
+                        false if path.file_name() == Some(OsStr::new(file)) => Some(path.into()),
                         // if path is a file that doesn't end with `file`, ignore it
                         false => None,
                     }
@@ -339,7 +337,7 @@ fn get_global_path<P: AsRef<Path>, T: AsRef<str>>(
         .collect_vec();
 
     match joined_paths.len() {
-        0 | 1 => Ok(joined_paths.first().map(ToOwned::to_owned)),
+        0 | 1 => Ok(joined_paths.first().map(Into::into)),
         _ => inquire_select(paths).map(Option::Some),
     }
 }
@@ -354,7 +352,7 @@ fn inquire_select<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
     let display_paths = paths.iter().map(DisplayPath).collect_vec();
 
     match inquire::Select::new("Select a Global file to use:", display_paths).prompt() {
-        Ok(path) => Ok(path.0.as_ref().to_path_buf()),
+        Ok(path) => Ok(path.0.as_ref().into()),
         Err(err) => Err(err.into()),
     }
 }

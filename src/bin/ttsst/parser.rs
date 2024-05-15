@@ -17,7 +17,7 @@ pub fn guid(s: &str) -> Result<String, ParseError> {
     let len = s.len();
     let is_numerical = s.chars().all(|c| c.is_ascii_alphanumeric());
     match (len, is_numerical) {
-        (6, true) => Ok(s.to_string()),
+        (6, true) => Ok(s.into()),
         _ => Err(ParseError::InvalidGUID),
     }
 }
