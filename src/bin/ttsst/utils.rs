@@ -14,7 +14,7 @@ impl<U: AsRef<[P]>, P: AsRef<Path> + Clone> Reduce<P> for U {
     fn reduce<T: FromIterator<P>>(&self) -> T {
         self.as_ref()
             .iter()
-            .unique_by(|path| path.as_ref().to_path_buf())
+            .unique_by(|path| path.as_ref().to_owned())
             .filter(|&this| {
                 !self.as_ref().iter().any(|other| {
                     let paths = (this.as_ref(), other.as_ref());

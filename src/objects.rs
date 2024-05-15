@@ -118,7 +118,7 @@ impl std::fmt::Display for Object {
                 (Ok(Some(lua)), Ok(None)) => format!("using {}", lua),
                 (Ok(None), Ok(Some(xml))) => format!("using {}", xml),
                 (Ok(Some(lua)), Ok(Some(xml))) => format!("using {} and {}", lua, xml),
-                _ => "".to_string(),
+                _ => "".into(),
             },
         ];
         // Filter out empty strings and join the remaining ones
